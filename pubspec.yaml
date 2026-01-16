@@ -47,6 +47,9 @@ dependencies:
   # 카카오 로그인
   kakao_flutter_sdk_user: ^1.9.6
 
+  # WebView
+  webview_flutter: ^4.10.0
+
   # Firebase
   firebase_core: ^3.9.0
   firebase_messaging: ^15.1.6

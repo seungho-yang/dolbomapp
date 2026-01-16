@@ -19,13 +19,21 @@ class _AutoLoginScreenState extends State<AutoLoginScreen> {
   }
 
   Future<void> _checkAutoLogin() async {
-    // 2초 대기 (스플래시 효과)
-    await Future.delayed(const Duration(seconds: 2));
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // AuthProvider 초기화 완료될 때까지 대기 (최대 5초)
+    int waitCount = 0;
+    while (!authProvider.isInitialized && waitCount < 50) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      waitCount++;
+    }
+
+    // 최소 스플래시 표시 시간 보장 (2초)
+    if (waitCount < 20) {
+      await Future.delayed(Duration(milliseconds: (20 - waitCount) * 100));
+    }
 
     if (!mounted) return;
-
-    // 로그인 상태 확인
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     // 로그인되어 있으면 MainPage로, 아니면 LoginScreen으로
     if (authProvider.isLoggedIn) {

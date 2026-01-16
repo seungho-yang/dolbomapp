@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../models/link_model.dart';
+import '../../services/api_service.dart';
+import '../webview_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -9,6 +12,73 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final bool _hasDangerousWords = false; // 임시: 위험단어 없음
+  final ApiService _apiService = ApiService();
+
+  // FAQ 및 공지사항 데이터
+  List<LinkModel> _faqList = [];
+  String? _noticeText;
+  bool _isLoadingFaq = true;
+  String? _faqError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLinks();
+  }
+
+  /// 링크 데이터 로드 (공지사항 + FAQ)
+  Future<void> _loadLinks() async {
+    try {
+      final response = await _apiService.getLinks();
+
+      if (response.statusCode == 200 && response.data != null) {
+        final List<dynamic> data = response.data as List<dynamic>;
+        final links = data.map((e) => LinkModel.fromJson(e)).toList();
+
+        final faqItems = <LinkModel>[];
+        String? notice;
+
+        for (final link in links) {
+          if (link.isFaq) {
+            faqItems.add(link);
+          } else if (link.isNotice) {
+            notice = link.blog;
+          }
+        }
+
+        setState(() {
+          _faqList = faqItems;
+          _noticeText = notice;
+          _isLoadingFaq = false;
+        });
+      } else {
+        setState(() {
+          _faqError = '데이터를 불러올 수 없습니다.';
+          _isLoadingFaq = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('링크 로드 실패: $e');
+      setState(() {
+        _faqError = '서버 통신이 원활하지 않습니다.';
+        _isLoadingFaq = false;
+      });
+    }
+  }
+
+  /// FAQ 항목 클릭 시 WebView로 이동
+  void _openFaqDetail(LinkModel faq) {
+    if (faq.blog != null && faq.blog!.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => WebViewScreen(
+            url: faq.blog!,
+            title: '자주묻는 문의',
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -143,10 +213,10 @@ class _HomeTabState extends State<HomeTab> {
             height: 32,
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Text(
-              'AI 돌보미 APP 리뉴얼',
-              style: TextStyle(
+              _noticeText ?? 'AI 돌보미 APP 리뉴얼',
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -284,52 +354,134 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  // 자주묻는 문의 섹션
+  // 자주묻는 문의 섹션 (썸네일 이미지 기반)
   Widget _buildFAQSection() {
-    final faqs = [
-      {'question': '앱 사용법을 알고 싶어요', 'answer': '사용 가이드 참조'},
-      {'question': '로그인이 안돼요', 'answer': '카카오톡 로그인 필요'},
-      {'question': '알림이 오지 않아요', 'answer': '알림 설정 확인'},
-    ];
+    // 로딩 중
+    if (_isLoadingFaq) {
+      return const SizedBox(
+        height: 150,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
+    // 에러 발생
+    if (_faqError != null) {
+      return SizedBox(
+        height: 150,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: Colors.grey.shade400, size: 40),
+              const SizedBox(height: 8),
+              Text(
+                _faqError!,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoadingFaq = true;
+                    _faqError = null;
+                  });
+                  _loadLinks();
+                },
+                child: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // FAQ 목록이 비어있음
+    if (_faqList.isEmpty) {
+      return SizedBox(
+        height: 150,
+        child: Center(
+          child: Text(
+            '등록된 FAQ가 없습니다.',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+        ),
+      );
+    }
+
+    // FAQ 목록 표시 (가로 스크롤, 썸네일 이미지)
     return SizedBox(
-      height: 120,
+      height: 170,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: faqs.length,
+        itemCount: _faqList.length,
         itemBuilder: (context, index) {
-          return Container(
-            width: 200,
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  faqs[index]['question']!,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+          final faq = _faqList[index];
+          return GestureDetector(
+            onTap: () => _openFaqDetail(faq),
+            child: Container(
+              width: 280,
+              margin: EdgeInsets.only(
+                right: index < _faqList.length - 1 ? 12 : 0,
+              ),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  faqs[index]['answer']!,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: faq.thumbnail != null && faq.thumbnail!.isNotEmpty
+                    ? Image.network(
+                        faq.thumbnail!,
+                        fit: BoxFit.cover,
+                        width: 280,
+                        height: 170,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            width: 280,
+                            height: 170,
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 280,
+                            height: 170,
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                                size: 40,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        width: 280,
+                        height: 170,
+                        color: Colors.grey.shade200,
+                        child: const Center(
+                          child: Icon(
+                            Icons.help_outline,
+                            color: Colors.grey,
+                            size: 40,
+                          ),
+                        ),
+                      ),
+              ),
             ),
           );
         },

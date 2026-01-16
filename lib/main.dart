@@ -9,6 +9,9 @@ import 'services/kakao_login_service.dart';
 import 'utils/constants.dart';
 
 void main() {
+  // Flutter 바인딩 초기화 (비동기 작업 전 필수)
+  WidgetsFlutterBinding.ensureInitialized();
+
   // 카카오 SDK 초기화
   KakaoLoginService.initialize(KakaoConstants.nativeAppKey);
 

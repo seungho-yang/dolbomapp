@@ -12,12 +12,14 @@ class AuthProvider with ChangeNotifier {
 
   bool _isLoggedIn = false;
   bool _isLoading = false;
+  bool _isInitialized = false;
   String? _userId;
   UserModel? _currentUser;
   String? _error;
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isLoading => _isLoading;
+  bool get isInitialized => _isInitialized;
   String? get userId => _userId;
   UserModel? get currentUser => _currentUser;
   String? get error => _error;
@@ -26,21 +28,58 @@ class AuthProvider with ChangeNotifier {
     _checkLoginStatus();
   }
 
-  // 로그인 상태 확인
+  // 로그인 상태 확인 (자동 로그인)
   Future<void> _checkLoginStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    _isLoggedIn = prefs.getBool(StorageKeys.isLoggedIn) ?? false;
-    _userId = prefs.getString(StorageKeys.userId);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isLoggedIn = prefs.getBool(StorageKeys.isLoggedIn) ?? false;
+      _userId = prefs.getString(StorageKeys.userId);
 
-    // 토큰이 있는지 확인
-    if (_isLoggedIn) {
-      final hasToken = await _kakaoLoginService.hasToken();
-      if (!hasToken) {
-        // 토큰이 없으면 로그아웃 처리
-        await logout();
+      // 저장된 로그인 상태가 있는 경우 토큰 유효성 검증
+      if (_isLoggedIn) {
+        final hasToken = await _kakaoLoginService.hasToken();
+        if (!hasToken) {
+          // 토큰이 없으면 로그아웃 처리
+          await _clearLoginInfo();
+          _isInitialized = true;
+          notifyListeners();
+          return;
+        }
+
+        // 토큰 유효성 검증 (Android 원본의 accessTokenInfo() 호출과 동일)
+        final tokenInfo = await _kakaoLoginService.getAccessTokenInfo();
+        if (tokenInfo == null) {
+          // 토큰이 만료되었거나 유효하지 않으면 로그아웃 처리
+          await _clearLoginInfo();
+          _isInitialized = true;
+          notifyListeners();
+          return;
+        }
+
+        // 토큰이 유효하면 사용자 정보 가져오기
+        final kakaoUser = await _kakaoLoginService.getUserInfo();
+        if (kakaoUser != null) {
+          _userId = kakaoUser.id.toString();
+          debugPrint('자동 로그인 성공: $_userId');
+        }
       }
+    } catch (e) {
+      debugPrint('로그인 상태 확인 실패: $e');
+      await _clearLoginInfo();
     }
+
+    _isInitialized = true;
     notifyListeners();
+  }
+
+  // 로그인 정보 클리어 (내부용)
+  Future<void> _clearLoginInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    _isLoggedIn = false;
+    _userId = null;
+    _currentUser = null;
+    _error = null;
   }
 
   // 카카오 로그인
