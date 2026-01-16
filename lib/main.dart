@@ -1,0 +1,41 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'screens/auto_login_screen.dart';
+import 'providers/auth_provider.dart';
+import 'providers/user_provider.dart';
+import 'providers/alarm_provider.dart';
+import 'providers/message_provider.dart';
+import 'services/kakao_login_service.dart';
+import 'utils/constants.dart';
+
+void main() {
+  // 카카오 SDK 초기화
+  KakaoLoginService.initialize(KakaoConstants.nativeAppKey);
+
+  runApp(const DolbomEEumApp());
+}
+
+class DolbomEEumApp extends StatelessWidget {
+  const DolbomEEumApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => AlarmProvider()),
+        ChangeNotifierProvider(create: (_) => MessageProvider()),
+      ],
+      child: MaterialApp(
+        title: '돌봄e음',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          useMaterial3: true,
+        ),
+        home: const AutoLoginScreen(),
+      ),
+    );
+  }
+}
