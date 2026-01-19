@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/link_model.dart';
 import '../../services/api_service.dart';
 import '../webview_screen.dart';
+import '../media/media_category_screen.dart';
+import '../search/doll_search_screen.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -57,10 +59,11 @@ class _HomeTabState extends State<HomeTab> {
           _isLoadingFaq = false;
         });
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('링크 로드 실패: $e');
+      debugPrint('스택트레이스: $stackTrace');
       setState(() {
-        _faqError = '서버 통신이 원활하지 않습니다.';
+        _faqError = '서버 통신이 원활하지 않습니다.\n$e';
         _isLoadingFaq = false;
       });
     }
@@ -242,8 +245,11 @@ class _HomeTabState extends State<HomeTab> {
                 const Color(0xFFF9C553), // 노란색/금색
                 'assets/images/home_search.png',
                 () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('인형검색 (추후 구현)')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DollSearchScreen(),
+                    ),
                   );
                 },
               ),
@@ -275,8 +281,11 @@ class _HomeTabState extends State<HomeTab> {
                 const Color(0xFFF78FAC), // 핑크색
                 'assets/images/home_media.png',
                 () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('미디어 (추후 구현)')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MediaCategoryScreen(),
+                    ),
                   );
                 },
               ),

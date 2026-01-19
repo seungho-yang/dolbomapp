@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/alarm_provider.dart';
 import 'providers/message_provider.dart';
+import 'providers/signalr_provider.dart';
 import 'services/kakao_login_service.dart';
 import 'utils/constants.dart';
 
@@ -29,6 +30,7 @@ class DolbomEEumApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => AlarmProvider()),
         ChangeNotifierProvider(create: (_) => MessageProvider()),
+        ChangeNotifierProvider(create: (_) => SignalRProvider()),
       ],
       child: MaterialApp(
         title: '돌봄e음',

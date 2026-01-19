@@ -7,18 +7,28 @@ part of 'media_model.dart';
 // **************************************************************************
 
 MediaModel _$MediaModelFromJson(Map<String, dynamic> json) => MediaModel(
-  id: (json['id'] as num?)?.toInt(),
-  title: json['title'] as String?,
-  url: json['url'] as String?,
-  code: (json['code'] as num?)?.toInt(),
-  thumbnail: json['thumbnail'] as String?,
-);
+      id: json['id'] as String?,
+      title: json['title'] as String?,
+      serial: json['serial'] as String?,
+      code: (json['code'] as num?)?.toInt(),
+      file: json['file'] as String?,
+      path: json['path'] as String?,
+      isClicked: json['isClicked'] as bool?,
+      procedure: (json['procedure'] as num?)?.toInt(),
+      description: json['description'] as String?,
+      botNum: (json['botNum'] as num?)?.toInt(),
+    );
 
 Map<String, dynamic> _$MediaModelToJson(MediaModel instance) =>
     <String, dynamic>{
       'id': instance.id,
       'title': instance.title,
-      'url': instance.url,
+      'serial': instance.serial,
       'code': instance.code,
-      'thumbnail': instance.thumbnail,
+      'file': instance.file,
+      'path': instance.path,
+      'isClicked': instance.isClicked,
+      'procedure': instance.procedure,
+      'description': instance.description,
+      'botNum': instance.botNum,
     };

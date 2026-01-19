@@ -28,8 +28,19 @@ class AuthProvider with ChangeNotifier {
     _checkLoginStatus();
   }
 
+  // 자동 로그인 바이패스 플래그 (개발용)
+  static const bool _bypassAutoLogin = false;
+
   // 로그인 상태 확인 (자동 로그인)
   Future<void> _checkLoginStatus() async {
+    // 자동 로그인 바이패스
+    if (_bypassAutoLogin) {
+      await _clearLoginInfo();
+      _isInitialized = true;
+      notifyListeners();
+      return;
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       _isLoggedIn = prefs.getBool(StorageKeys.isLoggedIn) ?? false;
@@ -80,6 +91,15 @@ class AuthProvider with ChangeNotifier {
     _userId = null;
     _currentUser = null;
     _error = null;
+  }
+
+  // 테스트용 사용자 설정 (개발용)
+  Future<void> setTestUser(String userId) async {
+    _userId = userId;
+    _isLoggedIn = true;
+    _isInitialized = true;
+    debugPrint('테스트 사용자 설정: $userId');
+    notifyListeners();
   }
 
   // 카카오 로그인

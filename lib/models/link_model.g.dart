@@ -8,7 +8,7 @@ part of 'link_model.dart';
 
 LinkModel _$LinkModelFromJson(Map<String, dynamic> json) => LinkModel(
       id: (json['id'] as num?)?.toInt(),
-      classification: json['classification'] as String?,
+      classification: (json['classification'] as num?)?.toInt(),
       blog: json['blog'] as String?,
       thumbnail: json['thumbNail'] as String?,
     );

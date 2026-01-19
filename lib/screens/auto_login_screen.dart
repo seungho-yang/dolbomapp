@@ -18,7 +18,25 @@ class _AutoLoginScreenState extends State<AutoLoginScreen> {
     _checkAutoLogin();
   }
 
+  // 로그인 바이패스 플래그 (개발용) - true면 바로 메인화면으로
+  static const bool _bypassLogin = true;
+  // 테스트용 userId (개발용)
+  static const String _testUserId = '4644';
+
   Future<void> _checkAutoLogin() async {
+    // 로그인 바이패스 - 바로 메인화면으로
+    if (_bypassLogin) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      // 테스트용 userId 설정
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.setTestUser(_testUserId);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const MainPage()),
+      );
+      return;
+    }
+
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     // AuthProvider 초기화 완료될 때까지 대기 (최대 5초)

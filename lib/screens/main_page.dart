@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/signalr_provider.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/message_tab.dart';
 import 'tabs/alarm_tab.dart';
@@ -23,6 +26,26 @@ class _MainPageState extends State<MainPage> {
     UserTab(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _initializeSignalR();
+  }
+
+  /// SignalR 연결 초기화
+  Future<void> _initializeSignalR() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final signalRProvider = Provider.of<SignalRProvider>(context, listen: false);
+
+    final userId = authProvider.userId;
+    if (userId != null && userId.isNotEmpty) {
+      await signalRProvider.connect(userId);
+      debugPrint('MainPage: SignalR 연결 완료 - userId: $userId');
+    } else {
+      debugPrint('MainPage: userId가 없어서 SignalR 연결 건너뜀');
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -32,8 +55,8 @@ class _MainPageState extends State<MainPage> {
   Future<bool> _onWillPop() async {
     final now = DateTime.now();
     final maxDuration = const Duration(seconds: 2);
-    final isWarning = _lastPressedAt == null ||
-        now.difference(_lastPressedAt!) > maxDuration;
+    final isWarning =
+        _lastPressedAt == null || now.difference(_lastPressedAt!) > maxDuration;
 
     if (isWarning) {
       _lastPressedAt = now;

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 
 class AlarmTab extends StatefulWidget {
   const AlarmTab({super.key});
@@ -10,19 +13,17 @@ class AlarmTab extends StatefulWidget {
 class _AlarmTabState extends State<AlarmTab> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ApiService _apiService = ApiService();
 
   List<Map<String, dynamic>> _allAlarms = [];
   List<Map<String, dynamic>> _filteredAlarms = [];
-
-  int _currentPage = 0;
-  final int _itemsPerPage = 10;
-  bool _isLoadingMore = false;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadAlarms();
-    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -32,22 +33,42 @@ class _AlarmTabState extends State<AlarmTab> {
     super.dispose();
   }
 
-  // 임시 더미 데이터 (30개)
-  void _loadAlarms() {
-    _allAlarms = List.generate(30, (index) {
-      return {
-        'id': '${10000 + index}',
-        'time': '${(index % 12) + 1}:${(index % 60).toString().padLeft(2, '0')}',
-        'period': index % 2 == 0 ? '오전' : '오후',
-        'days': ['월', '화', '수', '목', '금', '토', '일'], // 7일 모두 표시
-        'selectedDays': index % 2 == 0
-            ? ['월', '화', '수', '목', '금']
-            : ['토', '일'], // 선택된 요일
-        'isOn': index % 3 != 0, // 3개 중 2개는 켜짐
-        'label': index % 5 == 0 ? '약 복용 시간' : '',
-      };
-    });
-    _filteredAlarms = List.from(_allAlarms);
+  Future<void> _loadAlarms() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.userId;
+
+    if (userId == null) {
+      setState(() {
+        _error = '로그인이 필요합니다.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await _apiService.getAlarms(int.parse(userId));
+
+      if (response.statusCode == 200 && response.data != null) {
+        final List<dynamic> data = response.data as List<dynamic>;
+        setState(() {
+          _allAlarms = data.map((item) => Map<String, dynamic>.from(item)).toList();
+          _filteredAlarms = List.from(_allAlarms);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _allAlarms = [];
+          _filteredAlarms = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('알람 로드 실패: $e');
+      setState(() {
+        _error = '서버 통신이 원활하지 않습니다.';
+        _isLoading = false;
+      });
+    }
   }
 
   void _filterAlarms(String query) {
@@ -56,44 +77,74 @@ class _AlarmTabState extends State<AlarmTab> {
         _filteredAlarms = List.from(_allAlarms);
       } else {
         _filteredAlarms = _allAlarms
-            .where((alarm) => alarm['id'].toString().contains(query))
+            .where((alarm) => alarm['ai'].toString().contains(query))
             .toList();
       }
-      _currentPage = 0; // 검색 시 페이지 리셋
     });
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent * 0.9) {
-      _loadMoreAlarms();
+  /// bot 값에 따른 이미지 경로 반환
+  String _getBotImage(int bot) {
+    switch (bot) {
+      case 8:
+        return 'assets/images/mapodong.png';
+      case 13:
+        return 'assets/images/kingstrawberry.png';
+      case 14:
+        return 'assets/images/dongdaemun.png';
+      case 17:
+        return 'assets/images/haeon.png';
+      case 19:
+        return 'assets/images/hamo.png';
+      case 20:
+        return 'assets/images/atongii.png';
+      case 22:
+        return 'assets/images/gumdoll.png';
+      case 23:
+        return 'assets/images/gumsunii.png';
+      case 24:
+        return 'assets/images/bamangii.png';
+      case 25:
+        return 'assets/images/sangii.png';
+      case 26:
+        return 'assets/images/pepper.png';
+      case 27:
+        return 'assets/images/organic.png';
+      case 28:
+        return 'assets/images/future.png';
+      case 30:
+        return 'assets/images/sun_on.png';
+      case 31:
+        return 'assets/images/jangsangii.png';
+      case 32:
+      case 33:
+        return 'assets/images/jadu.png';
+      case 34:
+        return 'assets/images/rumi.png';
+      case 35:
+        return 'assets/images/gold_dragon.png';
+      default:
+        return 'assets/images/bokdongii.png';
     }
   }
 
-  void _loadMoreAlarms() {
-    if (_isLoadingMore) return;
+  /// division 문자열을 요일 리스트로 파싱
+  List<String> _parseDivision(String? division) {
+    if (division == null || division.isEmpty) return [];
+    // division은 "1,2,3,4,5" 형식 또는 "월,화,수" 형식일 수 있음
+    final days = ['일', '월', '화', '수', '목', '금', '토'];
+    final parts = division.split(',');
 
-    final totalPages = (_filteredAlarms.length / _itemsPerPage).ceil();
-    if (_currentPage >= totalPages - 1) return;
+    // 숫자인 경우
+    if (parts.isNotEmpty && int.tryParse(parts[0].trim()) != null) {
+      return parts.map((p) {
+        final idx = int.tryParse(p.trim()) ?? 0;
+        return idx < days.length ? days[idx] : '';
+      }).where((d) => d.isNotEmpty).toList();
+    }
 
-    setState(() {
-      _isLoadingMore = true;
-    });
-
-    // 페이지네이션 시뮬레이션
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        setState(() {
-          _currentPage++;
-          _isLoadingMore = false;
-        });
-      }
-    });
-  }
-
-  List<Map<String, dynamic>> get _displayedAlarms {
-    final endIndex = (_currentPage + 1) * _itemsPerPage;
-    return _filteredAlarms.take(endIndex.clamp(0, _filteredAlarms.length)).toList();
+    // 문자열인 경우
+    return parts.map((p) => p.trim()).toList();
   }
 
   @override
@@ -119,7 +170,7 @@ class _AlarmTabState extends State<AlarmTab> {
             ),
           ),
 
-          // 검색창 (예쁜 디자인)
+          // 검색창
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Container(
@@ -181,29 +232,52 @@ class _AlarmTabState extends State<AlarmTab> {
 
           // 알람 목록
           Expanded(
-            child: _displayedAlarms.isEmpty
-                ? const Center(
-                    child: Text(
-                      '알람이 없습니다',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(bottom: 120),
-                    itemCount: _displayedAlarms.length + (_isLoadingMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == _displayedAlarms.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _error!,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _isLoading = true;
+                                  _error = null;
+                                });
+                                _loadAlarms();
+                              },
+                              child: const Text('다시 시도'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _filteredAlarms.isEmpty
+                        ? const Center(
+                            child: Text(
+                              '알람이 없습니다',
+                              style: TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadAlarms,
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.only(bottom: 120),
+                              itemCount: _filteredAlarms.length,
+                              itemBuilder: (context, index) {
+                                return _buildAlarmItem(_filteredAlarms[index]);
+                              },
+                            ),
                           ),
-                        );
-                      }
-                      return _buildAlarmItem(_displayedAlarms[index]);
-                    },
-                  ),
           ),
         ],
       ),
@@ -221,6 +295,16 @@ class _AlarmTabState extends State<AlarmTab> {
   }
 
   Widget _buildAlarmItem(Map<String, dynamic> alarm) {
+    final id = alarm['id']?.toString() ?? '';
+    final ai = alarm['ai'] ?? 0;
+    final name = alarm['name']?.toString() ?? '알람';
+    final title = alarm['title']?.toString() ?? '';
+    final time = alarm['time']?.toString() ?? '';
+    final isOn = alarm['on'] ?? false;
+    final division = alarm['division']?.toString() ?? '';
+    final selectedDays = _parseDivision(division);
+    final allDays = ['일', '월', '화', '수', '목', '금', '토'];
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       padding: const EdgeInsets.all(16),
@@ -237,73 +321,92 @@ class _AlarmTabState extends State<AlarmTab> {
       ),
       child: Row(
         children: [
-          // 시간 표시
+          // 인형 이미지
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              _getBotImage(alarm['imagePath'] ?? 0),
+              width: 50,
+              height: 50,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.alarm, color: Colors.blue),
+                );
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // 시간 및 정보
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 인형 번호 (맨 위로 이동)
+                // 인형 번호
                 Text(
-                  '인형 번호: ${alarm['id']}',
+                  '인형 번호: $ai',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade500,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 // 시간
                 Text(
-                  '${alarm['period']} ${alarm['time']}',
+                  time,
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: alarm['isOn'] ? Colors.black : Colors.grey,
+                    color: isOn ? Colors.black : Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 8),
-                // 라벨
-                if (alarm['label'].isNotEmpty)
+                // 제목
+                if (title.isNotEmpty)
                   Text(
-                    alarm['label'],
+                    title,
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
                     ),
                   ),
                 const SizedBox(height: 8),
-                // 시계 아이콘과 요일 배지 (한 줄로)
+                // 요일
                 Row(
                   children: [
-                    // 시계 아이콘 (맨 왼쪽)
                     Icon(
                       Icons.access_time,
-                      size: 18,
-                      color: alarm['isOn'] ? Colors.blue : Colors.grey,
+                      size: 16,
+                      color: isOn ? Colors.blue : Colors.grey,
                     ),
                     const SizedBox(width: 8),
-                    // 요일 배지 (월화수목금토일 한 줄로 표시)
-                    ...List.generate((alarm['days'] as List<String>).length, (i) {
-                      final day = (alarm['days'] as List<String>)[i];
-                      final isSelected = (alarm['selectedDays'] as List<String>).contains(day);
+                    ...allDays.map((day) {
+                      final isSelected = selectedDays.contains(day);
                       return Padding(
                         padding: const EdgeInsets.only(right: 4),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 4,
+                            horizontal: 6,
+                            vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: alarm['isOn'] && isSelected
+                            color: isOn && isSelected
                                 ? Colors.blue.shade100
                                 : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             day,
                             style: TextStyle(
-                              fontSize: 11,
-                              color: alarm['isOn'] && isSelected
+                              fontSize: 10,
+                              color: isOn && isSelected
                                   ? Colors.blue
                                   : Colors.grey,
                               fontWeight: FontWeight.bold,
@@ -320,11 +423,12 @@ class _AlarmTabState extends State<AlarmTab> {
 
           // ON/OFF 스위치
           Switch(
-            value: alarm['isOn'],
+            value: isOn,
             onChanged: (value) {
               setState(() {
-                alarm['isOn'] = value;
+                alarm['on'] = value;
               });
+              // TODO: API 호출하여 알람 상태 업데이트
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(value ? '알람 켜짐' : '알람 꺼짐'),
@@ -335,17 +439,13 @@ class _AlarmTabState extends State<AlarmTab> {
             activeColor: Colors.blue,
           ),
 
-          // 세로 점 3개 메뉴 버튼
+          // 메뉴 버튼
           IconButton(
-            icon: const Icon(
-              Icons.more_vert,
-              color: Colors.grey,
-            ),
+            icon: const Icon(Icons.more_vert, color: Colors.grey),
             onPressed: () {
-              // 알람 설정 화면으로 이동 (기존 Android 앱과 동일)
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('알람 설정 화면 (${alarm['id']}) - 추후 구현'),
+                  content: Text('알람 설정 ($id) - 추후 구현'),
                   duration: const Duration(seconds: 1),
                 ),
               );
