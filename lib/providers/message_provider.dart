@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/message_chat_model.dart';
 import '../services/api_service.dart';
@@ -14,23 +15,42 @@ class MessageProvider with ChangeNotifier {
   String? get error => _error;
 
   // 특정 사용자의 메시지 목록 조회
-  Future<void> loadMessages(String userId) async {
+  Future<void> loadMessages(String odId) async {
+    debugPrint('MessageProvider: loadMessages 시작 - odId: $odId');
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getMessages(userId);
+      final response = await _apiService.getMessages(odId);
+      debugPrint('MessageProvider: API 응답 코드: ${response.statusCode}');
+      debugPrint('MessageProvider: API 응답 데이터 타입: ${response.data?.runtimeType}');
 
       if (response.statusCode == 200 && response.data != null) {
-        final List<dynamic> data = response.data;
-        _messagesByUser[userId] =
+        List<dynamic> data;
+        if (response.data is String) {
+          final jsonStr = response.data as String;
+          if (jsonStr.isEmpty) {
+            _messagesByUser[odId] = [];
+            _isLoading = false;
+            notifyListeners();
+            return;
+          }
+          data = jsonDecode(jsonStr);
+        } else {
+          data = response.data;
+        }
+        debugPrint('MessageProvider: 메시지 수: ${data.length}');
+        _messagesByUser[odId] =
             data.map((json) => MessageChatModel.fromJson(json)).toList();
+        debugPrint('MessageProvider: 파싱 완료 - ${_messagesByUser[odId]?.length}개');
       }
 
       _isLoading = false;
       notifyListeners();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('MessageProvider: 오류 - $e');
+      debugPrint('MessageProvider: 스택트레이스 - $stackTrace');
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
@@ -92,6 +112,28 @@ class MessageProvider with ChangeNotifier {
 
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  // 실시간 메시지 추가 (SignalR에서 수신한 메시지)
+  void addRealtimeMessage(String odId, MessageChatModel message) {
+    if (_messagesByUser[odId] == null) {
+      _messagesByUser[odId] = [];
+    }
+
+    // 중복 메시지 방지
+    final exists = _messagesByUser[odId]!.any((m) =>
+        m.message == message.message && m.reception == message.reception);
+
+    if (!exists) {
+      _messagesByUser[odId]!.insert(0, message);
+      notifyListeners();
+    }
+  }
+
+  // 특정 사용자의 메시지 캐시 삭제
+  void clearMessagesForUser(String userId) {
+    _messagesByUser.remove(userId);
     notifyListeners();
   }
 }

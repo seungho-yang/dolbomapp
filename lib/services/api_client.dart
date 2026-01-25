@@ -22,6 +22,10 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          // 실제 요청 URL 로깅
+          print('API Request: ${options.method} ${options.uri}');
+          print('API Request Headers: ${options.headers}');
+
           final prefs = await SharedPreferences.getInstance();
           final token = prefs.getString(StorageKeys.accessToken);
 
@@ -58,13 +62,16 @@ class ApiClient {
     Options? options,
   }) async {
     try {
+      print('ApiClient GET 시작: $path, params: $queryParameters');
       final response = await _dio.get(
         path,
         queryParameters: queryParameters,
         options: options,
       );
+      print('ApiClient GET 완료: ${response.statusCode}');
       return response;
     } on DioException catch (e) {
+      print('ApiClient GET 오류: ${e.type} - ${e.message}');
       throw _handleError(e);
     }
   }

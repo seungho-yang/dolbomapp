@@ -7,16 +7,16 @@ part of 'hub_model.dart';
 // **************************************************************************
 
 HubModel _$HubModelFromJson(Map<String, dynamic> json) => HubModel(
-      mode: (json['mode'] as num?)?.toInt(),
-      groupName: json['groupName'] as String?,
-      json: json['json'] as String?,
-    );
+  mode: (json['mode'] as num?)?.toInt(),
+  groupName: json['groupName'] as String?,
+  json: json['json'] as String?,
+);
 
 Map<String, dynamic> _$HubModelToJson(HubModel instance) => <String, dynamic>{
-      'mode': instance.mode,
-      'groupName': instance.groupName,
-      'json': instance.json,
-    };
+  'mode': instance.mode,
+  'groupName': instance.groupName,
+  'json': instance.json,
+};
 
 HubMessageModel _$HubMessageModelFromJson(Map<String, dynamic> json) =>
     HubMessageModel(

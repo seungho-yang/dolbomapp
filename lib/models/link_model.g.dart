@@ -7,15 +7,15 @@ part of 'link_model.dart';
 // **************************************************************************
 
 LinkModel _$LinkModelFromJson(Map<String, dynamic> json) => LinkModel(
-      id: (json['id'] as num?)?.toInt(),
-      classification: (json['classification'] as num?)?.toInt(),
-      blog: json['blog'] as String?,
-      thumbnail: json['thumbNail'] as String?,
-    );
+  id: (json['id'] as num?)?.toInt(),
+  classification: (json['classification'] as num?)?.toInt(),
+  blog: json['blog'] as String?,
+  thumbnail: json['thumbNail'] as String?,
+);
 
 Map<String, dynamic> _$LinkModelToJson(LinkModel instance) => <String, dynamic>{
-      'id': instance.id,
-      'classification': instance.classification,
-      'blog': instance.blog,
-      'thumbNail': instance.thumbnail,
-    };
+  'id': instance.id,
+  'classification': instance.classification,
+  'blog': instance.blog,
+  'thumbNail': instance.thumbnail,
+};

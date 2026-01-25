@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/alarm_provider.dart';
 import '../providers/signalr_provider.dart';
+import '../providers/user_provider.dart';
+import '../services/global_user_info.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/message_tab.dart';
 import 'tabs/alarm_tab.dart';
@@ -26,23 +29,58 @@ class _MainPageState extends State<MainPage> {
     UserTab(),
   ];
 
+  bool _appInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    _initializeSignalR();
+    // 첫 번째 프레임 렌더링 후 초기화 시작 (UI 블로킹 방지)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeApp();
+    });
   }
 
-  /// SignalR 연결 초기화
-  Future<void> _initializeSignalR() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  /// 앱 초기화 - 사용자 데이터 로드 및 SignalR 연결
+  /// Java의 Home.java 생성자와 동일한 역할
+  Future<void> _initializeApp() async {
+    if (_appInitialized) return;
+    _appInitialized = true;
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final alarmProvider = Provider.of<AlarmProvider>(context, listen: false);
     final signalRProvider = Provider.of<SignalRProvider>(context, listen: false);
 
-    final userId = authProvider.userId;
+    // GlobalUserInfo 싱글톤에서 userId 가져오기 (Java의 GlobalLogin.getInstance().getUserInfo().getUserId()와 동일)
+    final userId = GlobalUserInfo.instance.userId;
     if (userId != null && userId.isNotEmpty) {
-      await signalRProvider.connect(userId);
-      debugPrint('MainPage: SignalR 연결 완료 - userId: $userId');
+      final userIdInt = int.parse(userId);
+
+      // 1. 보호대상자 목록 로드 (Java Home.java 생성자의 API 호출과 동일)
+      // GET /app?id={userId}
+      debugPrint('MainPage: 보호대상자 목록 로드 시작 - userId: $userId');
+      userProvider.loadUsers(userIdInt).then((_) {
+        debugPrint('MainPage: 보호대상자 목록 로드 완료 - ${userProvider.users.length}명');
+      }).catchError((e) {
+        debugPrint('MainPage: 보호대상자 목록 로드 실패 - $e');
+      });
+
+      // 2. 알람 목록 로드
+      // GET /alarm?id={userId}
+      debugPrint('MainPage: 알람 목록 로드 시작 - userId: $userId');
+      alarmProvider.loadAlarms(userIdInt).then((_) {
+        debugPrint('MainPage: 알람 목록 로드 완료 - ${alarmProvider.alarms.length}개');
+      }).catchError((e) {
+        debugPrint('MainPage: 알람 목록 로드 실패 - $e');
+      });
+
+      // 3. SignalR 연결 (실시간 배터리 업데이트 등)
+      signalRProvider.connect(userId).then((_) {
+        debugPrint('MainPage: SignalR 연결 완료 - userId: $userId');
+      }).catchError((e) {
+        debugPrint('MainPage: SignalR 연결 실패 - $e');
+      });
     } else {
-      debugPrint('MainPage: userId가 없어서 SignalR 연결 건너뜀');
+      debugPrint('MainPage: userId가 없어서 초기화 건너뜀 (GlobalUserInfo.userId: $userId)');
     }
   }
 

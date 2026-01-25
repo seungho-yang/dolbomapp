@@ -4,6 +4,7 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/kakao_login_service.dart';
+import '../services/global_user_info.dart';
 import '../utils/constants.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -13,6 +14,7 @@ class AuthProvider with ChangeNotifier {
   bool _isLoggedIn = false;
   bool _isLoading = false;
   bool _isInitialized = false;
+  bool _isTestMode = false; // 테스트 모드 플래그
   String? _userId;
   UserModel? _currentUser;
   String? _error;
@@ -50,8 +52,10 @@ class AuthProvider with ChangeNotifier {
       if (_isLoggedIn) {
         final hasToken = await _kakaoLoginService.hasToken();
         if (!hasToken) {
-          // 토큰이 없으면 로그아웃 처리
-          await _clearLoginInfo();
+          // 토큰이 없으면 로그아웃 처리 (테스트 모드가 아닐 때만)
+          if (!_isTestMode) {
+            await _clearLoginInfo();
+          }
           _isInitialized = true;
           notifyListeners();
           return;
@@ -60,8 +64,10 @@ class AuthProvider with ChangeNotifier {
         // 토큰 유효성 검증 (Android 원본의 accessTokenInfo() 호출과 동일)
         final tokenInfo = await _kakaoLoginService.getAccessTokenInfo();
         if (tokenInfo == null) {
-          // 토큰이 만료되었거나 유효하지 않으면 로그아웃 처리
-          await _clearLoginInfo();
+          // 토큰이 만료되었거나 유효하지 않으면 로그아웃 처리 (테스트 모드가 아닐 때만)
+          if (!_isTestMode) {
+            await _clearLoginInfo();
+          }
           _isInitialized = true;
           notifyListeners();
           return;
@@ -76,7 +82,10 @@ class AuthProvider with ChangeNotifier {
       }
     } catch (e) {
       debugPrint('로그인 상태 확인 실패: $e');
-      await _clearLoginInfo();
+      // 테스트 모드가 아닐 때만 로그인 정보 클리어
+      if (!_isTestMode) {
+        await _clearLoginInfo();
+      }
     }
 
     _isInitialized = true;
@@ -94,11 +103,18 @@ class AuthProvider with ChangeNotifier {
   }
 
   // 테스트용 사용자 설정 (개발용)
-  Future<void> setTestUser(String userId) async {
-    _userId = userId;
+  // Java의 GlobalLogin.getInstance().getUserInfo().setUserId()와 동일
+  Future<void> setTestUser([String? userId]) async {
+    final testUserId = userId ?? TestUserIds.defaultUser;
+    _isTestMode = true; // 테스트 모드 활성화
+    _userId = testUserId;
     _isLoggedIn = true;
     _isInitialized = true;
-    debugPrint('테스트 사용자 설정: $userId');
+
+    // GlobalUserInfo 싱글톤에도 설정 (Provider 없이 전역 접근 가능)
+    GlobalUserInfo.instance.setTestUser(testUserId);
+
+    debugPrint('테스트 사용자 설정: $testUserId');
     notifyListeners();
   }
 
@@ -140,6 +156,15 @@ class AuthProvider with ChangeNotifier {
         await _saveLoginInfo(token.accessToken, token.refreshToken ?? '');
         _isLoggedIn = true;
         _isLoading = false;
+
+        // GlobalUserInfo 싱글톤에도 설정 (Provider 없이 전역 접근 가능)
+        GlobalUserInfo.instance.setKakaoUserInfo(
+          userId: _userId!,
+          email: kakaoUser.kakaoAccount?.email,
+          nickname: kakaoUser.kakaoAccount?.profile?.nickname,
+          profileImageUrl: kakaoUser.kakaoAccount?.profile?.profileImageUrl,
+        );
+
         notifyListeners();
         return true;
       }
@@ -197,6 +222,11 @@ class AuthProvider with ChangeNotifier {
     _userId = null;
     _currentUser = null;
     _error = null;
+    _isTestMode = false;
+
+    // GlobalUserInfo 싱글톤도 클리어
+    GlobalUserInfo.instance.clear();
+
     notifyListeners();
   }
 

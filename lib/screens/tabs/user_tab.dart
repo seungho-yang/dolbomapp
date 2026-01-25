@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/user_provider.dart';
+import '../../models/message_profile_model.dart';
 
 class UserTab extends StatefulWidget {
   const UserTab({super.key});
@@ -10,16 +13,13 @@ class UserTab extends StatefulWidget {
 class _UserTabState extends State<UserTab> {
   final TextEditingController _searchController = TextEditingController();
 
-  List<Map<String, dynamic>> _allUsers = [];
-  List<Map<String, dynamic>> _filteredUsers = [];
-
+  List<MessageProfileModel> _filteredUsers = [];
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
   @override
   void initState() {
     super.initState();
-    _loadUsers();
   }
 
   @override
@@ -28,32 +28,13 @@ class _UserTabState extends State<UserTab> {
     super.dispose();
   }
 
-  // 임시 더미 데이터 (25개)
-  void _loadUsers() {
-    _allUsers = List.generate(25, (index) {
-      return {
-        'id': '${20000 + index}',
-        'name': '보호대상자 ${index + 1}',
-        'battery': (index % 4) == 0
-            ? 'full'
-            : (index % 4) == 1
-                ? 'middle'
-                : (index % 4) == 2
-                    ? 'low'
-                    : 'battery',
-        'status': index % 7 == 0 ? '비활성' : '활성',
-      };
-    });
-    _filteredUsers = List.from(_allUsers);
-  }
-
-  void _filterUsers(String query) {
+  void _filterUsers(String query, List<MessageProfileModel> allUsers) {
     setState(() {
       if (query.isEmpty) {
-        _filteredUsers = List.from(_allUsers);
+        _filteredUsers = List.from(allUsers);
       } else {
-        _filteredUsers = _allUsers
-            .where((user) => user['id'].toString().contains(query))
+        _filteredUsers = allUsers
+            .where((user) => user.id?.contains(query) ?? false)
             .toList();
       }
       _currentPage = 1; // 검색 시 첫 페이지로 리셋
@@ -64,7 +45,8 @@ class _UserTabState extends State<UserTab> {
     return (_filteredUsers.length / _itemsPerPage).ceil();
   }
 
-  List<Map<String, dynamic>> get _displayedUsers {
+  List<MessageProfileModel> get _displayedUsers {
+    if (_filteredUsers.isEmpty) return [];
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = startIndex + _itemsPerPage;
     return _filteredUsers.sublist(
@@ -73,133 +55,169 @@ class _UserTabState extends State<UserTab> {
     );
   }
 
-  String _getBatteryImage(String battery) {
-    switch (battery) {
-      case 'full':
-        return 'assets/images/full.png';
-      case 'middle':
-        return 'assets/images/middle.png';
-      case 'low':
-        return 'assets/images/low.png';
-      default:
-        return 'assets/images/battery.png';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Column(
-        children: [
-          // 배너 이미지
-          GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('보호대상자 도움말 (추후 구현)')),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              child: Image.asset(
-                'assets/images/user_banner.png',
-                height: 110,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
+    return Consumer<UserProvider>(
+      builder: (context, userProvider, child) {
+        // 필터링된 목록 초기화 (Provider 데이터 변경 시)
+        if (_filteredUsers.isEmpty && userProvider.users.isNotEmpty) {
+          _filteredUsers = List.from(userProvider.users);
+        }
 
-          // 검색창 (알람 탭과 동일한 예쁜 디자인)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.shade300,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '인형 번호로 검색',
-                  hintStyle: TextStyle(
-                    color: Colors.grey.shade400,
-                    fontSize: 15,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 14,
-                  ),
-                  prefixIcon: Icon(
-                    Icons.search,
-                    color: Colors.grey.shade400,
-                    size: 22,
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(
-                            Icons.clear,
-                            color: Colors.grey.shade400,
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _filterUsers('');
-                            });
-                          },
-                        )
-                      : null,
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _filterUsers(value);
-                  });
+        return Scaffold(
+          backgroundColor: const Color(0xFFF5F5F5),
+          body: Column(
+            children: [
+              // 배너 이미지
+              GestureDetector(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('보호대상자 도움말 (추후 구현)')),
+                  );
                 },
-              ),
-            ),
-          ),
-
-          // 사용자 목록
-          Expanded(
-            child: _displayedUsers.isEmpty
-                ? const Center(
-                    child: Text(
-                      '보호대상자가 없습니다',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    itemCount: _displayedUsers.length,
-                    itemBuilder: (context, index) {
-                      return _buildUserItem(_displayedUsers[index]);
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  child: Image.asset(
+                    'assets/images/user_banner.png',
+                    height: 110,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 110,
+                        color: Colors.blue.shade100,
+                        child: const Center(
+                          child: Text(
+                            '보호대상자 도움말',
+                            style: TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      );
                     },
                   ),
-          ),
-
-          // 페이지네이션 (숫자만)
-          if (_filteredUsers.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: _buildPageNumbers(),
+                ),
               ),
-            ),
 
-          const SizedBox(height: 60), // 하단 네비게이션 여백
-        ],
-      ),
+              // 검색창
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.shade300,
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: '인형 번호로 검색',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 15,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Colors.grey.shade400,
+                        size: 22,
+                      ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                color: Colors.grey.shade400,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _filterUsers('', userProvider.users);
+                                });
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (value) {
+                      _filterUsers(value, userProvider.users);
+                    },
+                  ),
+                ),
+              ),
+
+              // 사용자 목록
+              Expanded(
+                child: userProvider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : userProvider.error != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  userProvider.error!,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    // 새로고침은 MainPage에서 처리됨
+                                  },
+                                  child: const Text('다시 시도'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _displayedUsers.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  '보호대상자가 없습니다',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.only(bottom: 20),
+                                itemCount: _displayedUsers.length,
+                                itemBuilder: (context, index) {
+                                  return _buildUserItem(_displayedUsers[index]);
+                                },
+                              ),
+              ),
+
+              // 페이지네이션
+              if (_filteredUsers.isNotEmpty && _totalPages > 1)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: _buildPageNumbers(),
+                  ),
+                ),
+
+              const SizedBox(height: 60), // 하단 네비게이션 여백
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -269,14 +287,14 @@ class _UserTabState extends State<UserTab> {
     );
   }
 
-  Widget _buildUserItem(Map<String, dynamic> user) {
-    final batteryImage = _getBatteryImage(user['battery']);
+  Widget _buildUserItem(MessageProfileModel user) {
+    final batteryImage = user.batteryImagePath ?? 'assets/images/battery.png';
 
     return InkWell(
       onTap: () {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${user['name']} 상세정보 (추후 구현)'),
+            content: Text('${user.displayName} 상세정보 (추후 구현)'),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -297,18 +315,29 @@ class _UserTabState extends State<UserTab> {
         ),
         child: Row(
           children: [
-            // 프로필 아이콘
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.purple.shade100,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: const Icon(
-                Icons.person,
-                color: Colors.purple,
-                size: 36,
+            // 인형 이미지
+            ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: Image.asset(
+                user.botImagePath,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade100,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Icon(
+                      Icons.smart_toy,
+                      color: Colors.purple,
+                      size: 36,
+                    ),
+                  );
+                },
               ),
             ),
 
@@ -323,7 +352,7 @@ class _UserTabState extends State<UserTab> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        user['name'],
+                        user.displayName,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -336,16 +365,16 @@ class _UserTabState extends State<UserTab> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: user['status'] == '활성'
+                          color: (user.state ?? 0) > 0
                               ? Colors.green.shade100
                               : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          user['status'],
+                          (user.state ?? 0) > 0 ? '활성' : '비활성',
                           style: TextStyle(
                             fontSize: 12,
-                            color: user['status'] == '활성'
+                            color: (user.state ?? 0) > 0
                                 ? Colors.green.shade700
                                 : Colors.grey.shade700,
                             fontWeight: FontWeight.bold,
@@ -356,7 +385,7 @@ class _UserTabState extends State<UserTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '인형 번호: ${user['id']}',
+                    '인형 번호: ${user.id ?? ''}',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey.shade600,
@@ -373,6 +402,13 @@ class _UserTabState extends State<UserTab> {
               batteryImage,
               width: 32,
               height: 32,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(
+                  Icons.battery_unknown,
+                  size: 32,
+                  color: Colors.grey,
+                );
+              },
             ),
           ],
         ),

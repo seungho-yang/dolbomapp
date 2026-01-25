@@ -29,3 +29,19 @@ class KakaoConstants {
   // TODO: 실제 카카오 앱 키로 변경 필요
   static const String nativeAppKey = '1899200f5e3244d9354cdd30266e521d';
 }
+
+/// 테스트용 더미 userId (카카오 로그인 연동 전 개발용)
+class TestUserIds {
+  // 실제 카카오 사용자 ID
+  static const String kakaoUser = '2285656840';
+
+  // 인형 ID (dialog API용)
+  static const String doll1 = '7748';
+  static const String doll2 = '4616';
+
+  // 기본 테스트 사용자 (카카오 사용자 ID)
+  static const String defaultUser = kakaoUser;
+
+  // 모든 테스트 사용자 목록
+  static const List<String> all = [kakaoUser, doll1, doll2];
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/constants.dart';
 import 'login_screen.dart';
 import 'main_page.dart';
 
@@ -20,17 +21,20 @@ class _AutoLoginScreenState extends State<AutoLoginScreen> {
 
   // 로그인 바이패스 플래그 (개발용) - true면 바로 메인화면으로
   static const bool _bypassLogin = true;
-  // 테스트용 userId (개발용)
-  static const String _testUserId = '4644';
+  // 테스트용 userId (실제 카카오 사용자 ID: 2285656840)
+  static const String _testUserId = TestUserIds.kakaoUser;
 
   Future<void> _checkAutoLogin() async {
     // 로그인 바이패스 - 바로 메인화면으로
     if (_bypassLogin) {
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
-      // 테스트용 userId 설정
+      // 테스트용 userId 설정 (GlobalUserInfo 싱글톤에도 자동 저장됨)
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.setTestUser(_testUserId);
+      // Provider 상태 반영 대기
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const MainPage()),
       );

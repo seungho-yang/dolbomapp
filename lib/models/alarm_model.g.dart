@@ -7,7 +7,7 @@ part of 'alarm_model.dart';
 // **************************************************************************
 
 AlarmModel _$AlarmModelFromJson(Map<String, dynamic> json) => AlarmModel(
-  id: json['id'] as String?,
+  id: AlarmModel._idFromJson(json['id']),
   title: json['title'] as String?,
   contents: json['contents'] as String?,
   on: json['on'] as bool?,
@@ -20,7 +20,7 @@ AlarmModel _$AlarmModelFromJson(Map<String, dynamic> json) => AlarmModel(
 
 Map<String, dynamic> _$AlarmModelToJson(AlarmModel instance) =>
     <String, dynamic>{
-      'id': instance.id,
+      'id': AlarmModel._idToJson(instance.id),
       'title': instance.title,
       'contents': instance.contents,
       'on': instance.on,
