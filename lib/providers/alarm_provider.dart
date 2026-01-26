@@ -31,6 +31,9 @@ class AlarmProvider with ChangeNotifier {
       debugPrint('AlarmProvider: 알람 목록 로드 시작 - userId: $userId');
       final response = await _apiService.getAlarms(userId);
 
+      debugPrint('AlarmProvider: 알람 목록 응답 - statusCode: ${response.statusCode}');
+      debugPrint('AlarmProvider: 알람 목록 응답 - data: ${response.data}');
+
       if (response.statusCode == 200 && response.data != null) {
         List<dynamic> data;
         if (response.data is String) {
@@ -50,6 +53,9 @@ class AlarmProvider with ChangeNotifier {
         _alarms = data.map((json) => AlarmModel.fromJson(json)).toList();
         _isLoaded = true;
         debugPrint('AlarmProvider: 알람 ${_alarms.length}개 로드 완료');
+        for (var alarm in _alarms) {
+          debugPrint('  - 알람: id=${alarm.id}, title=${alarm.title}, ai=${alarm.ai}');
+        }
       } else {
         _alarms = [];
         _isLoaded = true;
@@ -73,8 +79,15 @@ class AlarmProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('AlarmProvider: 알람 추가 - ${alarm.title}');
-      final response = await _apiService.postAlarm(alarm.toJson());
+      final jsonData = alarm.toJson();
+      // name 필드 제거 (Android와 동일하게)
+      jsonData.remove('name');
+
+      debugPrint('AlarmProvider: 알람 추가 요청 데이터 - $jsonData');
+      final response = await _apiService.postAlarm(jsonData);
+
+      debugPrint('AlarmProvider: 알람 추가 응답 - statusCode: ${response.statusCode}');
+      debugPrint('AlarmProvider: 알람 추가 응답 - data: ${response.data}');
 
       if (response.statusCode == 200) {
         // 서버에서 알람 목록 다시 조회하여 최신 데이터 유지
@@ -103,17 +116,32 @@ class AlarmProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('AlarmProvider: 알람 수정 - ${alarm.id}');
-      final response = await _apiService.patchAlarm(userId, alarm.toJson());
+      final jsonData = alarm.toJson();
+      // name 필드 제거 (Android와 동일하게)
+      jsonData.remove('name');
 
-      if (response.statusCode == 200) {
-        // 로컬 데이터 업데이트
+      debugPrint('AlarmProvider: 알람 수정 요청 데이터 - $jsonData');
+      final response = await _apiService.patchAlarm(userId, jsonData);
+
+      debugPrint('AlarmProvider: 알람 수정 응답 - statusCode: ${response.statusCode}');
+      debugPrint('AlarmProvider: 알람 수정 응답 - data: ${response.data}');
+
+      // 200 OK 또는 204 No Content 모두 성공
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // 로컬 목록에서 직접 업데이트 (삭제와 동일한 방식)
+        debugPrint('AlarmProvider: 수정할 알람 id = ${alarm.id}');
+        debugPrint('AlarmProvider: 현재 목록 = ${_alarms.map((a) => a.id).toList()}');
         final index = _alarms.indexWhere((a) => a.id == alarm.id);
+        debugPrint('AlarmProvider: 찾은 index = $index');
         if (index != -1) {
           _alarms[index] = alarm;
+          debugPrint('AlarmProvider: 로컬 목록 업데이트 완료');
+        } else {
+          debugPrint('AlarmProvider: 알람을 찾지 못함!');
         }
         _isLoading = false;
         notifyListeners();
+        debugPrint('AlarmProvider: notifyListeners 호출됨');
         return true;
       }
 

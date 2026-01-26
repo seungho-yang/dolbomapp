@@ -66,17 +66,14 @@ class _AlarmTabState extends State<AlarmTab> {
 
   /// 알람 수정 화면으로 이동
   Future<void> _navigateToEditAlarm(AlarmModel alarm) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AlarmSettingScreen(alarm: alarm),
       ),
     );
-
-    if (result != null) {
-      // 알람이 수정되면 목록 새로고침
-      _loadAlarms();
-    }
+    // 수정은 Provider에서 로컬 목록을 직접 업데이트하므로
+    // 추가 로드 불필요 (서버 캐시 문제 방지)
   }
 
   /// 알람 삭제 확인 다이얼로그
@@ -679,25 +676,50 @@ class _AlarmTabState extends State<AlarmTab> {
     );
   }
 
-  /// 요일 라벨 위젯 - Java와 동일한 스타일
+  /// 요일 라벨 위젯 - 선택된 요일 강조 표시
   Widget _buildDayLabel(String day, bool isSelected, bool isOn, bool isWeekend) {
+    const primaryColor = Color(0xFF258AE4);
+
     Color textColor;
+    Color? backgroundColor;
+
     if (!isOn) {
       textColor = const Color(0xFFD8D8D8);
+      backgroundColor = isSelected ? const Color(0xFFD8D8D8).withValues(alpha: 0.3) : null;
     } else if (isSelected) {
-      textColor = const Color(0xFF258AE4);
+      textColor = Colors.white;
+      backgroundColor = primaryColor;
     } else if (isWeekend) {
-      textColor = Colors.red;
+      textColor = Colors.red.shade300;
     } else {
-      textColor = Colors.black;
+      textColor = Colors.grey.shade500;
     }
 
-    return Text(
-      day,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: textColor,
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: isSelected && isOn
+            ? [
+                BoxShadow(
+                  color: primaryColor.withValues(alpha: 0.4),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Center(
+        child: Text(
+          day,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: textColor,
+          ),
+        ),
       ),
     );
   }

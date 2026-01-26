@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../models/alarm_model.dart';
 import '../../models/message_profile_model.dart';
@@ -28,11 +27,8 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
   MessageProfileModel? _selectedUser;
 
   // 시간 설정
-  DateTime _selectedTime = DateTime.now();
-
-  // 날짜 설정
-  DateTime _selectedDate = DateTime.now();
-  bool _isDateChanged = false;
+  int _selectedHour = DateTime.now().hour;
+  int _selectedMinute = DateTime.now().minute;
 
   // 요일 선택 상태 (월화수목금토일)
   final List<bool> _selectedDays = [false, false, false, false, false, false, false];
@@ -41,13 +37,20 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
 
   bool _isSubmitting = false;
 
+  // 앱 주요 색상
+  static const Color primaryColor = Color(0xFF258AE4);
+  static const Color primaryLightColor = Color(0xFF5BA8F0);
+  static const Color backgroundColor = Color(0xFFF5F7FA);
+  static const Color cardColor = Colors.white;
+  static const Color textPrimaryColor = Color(0xFF1A1A2E);
+  static const Color textSecondaryColor = Color(0xFF6B7280);
+
   @override
   void initState() {
     super.initState();
     _initializeFromAlarm();
   }
 
-  /// 기존 알람 데이터로 초기화
   void _initializeFromAlarm() {
     final alarm = widget.alarm;
 
@@ -57,30 +60,18 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
     // 시간 설정
     final timeOfDay = alarm.timeOfDay;
     if (timeOfDay != null) {
-      _selectedTime = DateTime(2024, 1, 1, timeOfDay.hour, timeOfDay.minute);
+      _selectedHour = timeOfDay.hour;
+      _selectedMinute = timeOfDay.minute;
     }
 
-    // 날짜/요일 설정
-    if (alarm.classification == 1) {
-      // 특정 날짜
-      final specificDate = alarm.specificDate;
-      if (specificDate != null) {
-        _selectedDate = specificDate;
-        _isDateChanged = true;
-      }
-    } else {
-      // 반복 요일 - division에서 요일 인덱스 파싱
-      final division = alarm.division ?? '';
-      for (int i = 0; i < division.length; i++) {
-        final dayIndex = int.tryParse(division[i]);
-        if (dayIndex != null) {
-          // Java 인덱스를 Flutter 인덱스로 변환
-          // Java: 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
-          // Flutter: 0=월, 1=화, 2=수, 3=목, 4=금, 5=토, 6=일
-          final flutterIndex = dayIndex == 0 ? 6 : dayIndex - 1;
-          if (flutterIndex >= 0 && flutterIndex < 7) {
-            _selectedDays[flutterIndex] = true;
-          }
+    // 요일 설정
+    final division = alarm.division ?? '';
+    for (int i = 0; i < division.length; i++) {
+      final dayIndex = int.tryParse(division[i]);
+      if (dayIndex != null) {
+        final flutterIndex = dayIndex == 0 ? 6 : dayIndex - 1;
+        if (flutterIndex >= 0 && flutterIndex < 7) {
+          _selectedDays[flutterIndex] = true;
         }
       }
     }
@@ -107,13 +98,6 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
 
   bool get _hasSelectedDays => _selectedDays.any((d) => d);
 
-  bool get _isToday {
-    final now = DateTime.now();
-    return _selectedDate.year == now.year &&
-           _selectedDate.month == now.month &&
-           _selectedDate.day == now.day;
-  }
-
   bool _validateInputs() {
     if (_selectedUser == null) {
       _showError('보호 대상 아이디를 선택해주세요.');
@@ -125,8 +109,8 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
       return false;
     }
 
-    if (_hasSelectedDays && _isDateChanged && !_isToday) {
-      _showError('날짜와 요일은 둘다 설정하실 수 없습니다.');
+    if (!_hasSelectedDays) {
+      _showError('요일을 선택해주세요.');
       return false;
     }
 
@@ -136,8 +120,17 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -150,18 +143,10 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
     final alarmProvider = Provider.of<AlarmProvider>(context, listen: false);
     final userId = int.tryParse(GlobalUserInfo.instance.userId ?? '') ?? 0;
 
-    final timeStr = '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+    final timeStr = '${_selectedHour.toString().padLeft(2, '0')}:${_selectedMinute.toString().padLeft(2, '0')}';
 
-    int classification;
-    String division;
-
-    if (_hasSelectedDays) {
-      classification = 0;
-      division = _buildDivisionString();
-    } else {
-      classification = 1;
-      division = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
-    }
+    const int classification = 0;
+    final String division = _buildDivisionString();
 
     final updatedAlarm = AlarmModel(
       id: widget.alarm.id,
@@ -188,9 +173,18 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
     if (success) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('알람이 수정되었습니다.'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: Colors.white),
+                SizedBox(width: 12),
+                Text('알람이 수정되었습니다.'),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
           ),
         );
         Navigator.pop(context, updatedAlarm);
@@ -203,26 +197,14 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
+      backgroundColor: backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             // 헤더
-            Container(
-              width: double.infinity,
-              height: 70,
-              color: Colors.white,
-              alignment: Alignment.center,
-              child: const Text(
-                '알람수정',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
+            _buildHeader(),
 
+            // 스크롤 가능한 콘텐츠
             Expanded(
               child: Consumer<UserProvider>(
                 builder: (context, userProvider, child) {
@@ -240,45 +222,61 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
                   }
 
                   return SingleChildScrollView(
-                    child: Container(
-                      color: const Color(0xFFE8E8E8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionTitle('보호 대상'),
-                          _buildDropdown(users),
-                          const SizedBox(height: 8),
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 보호 대상 카드
+                        _buildCard(
+                          icon: Icons.person_outline,
+                          title: '보호 대상',
+                          child: _buildDropdown(users),
+                        ),
+                        const SizedBox(height: 16),
 
-                          _buildSectionTitle('알람 이름'),
-                          _buildTextField(
-                            controller: _titleController,
-                            hint: '알람 이름을 입력하세요.',
+                        // 알람 정보 카드
+                        _buildCard(
+                          icon: Icons.edit_notifications_outlined,
+                          title: '알람 정보',
+                          child: Column(
+                            children: [
+                              _buildTextField(
+                                controller: _titleController,
+                                hint: '알람 이름을 입력하세요',
+                                icon: Icons.label_outline,
+                              ),
+                              const SizedBox(height: 16),
+                              _buildTextField(
+                                controller: _contentsController,
+                                hint: '알람 내용을 입력하세요',
+                                icon: Icons.notes,
+                                maxLines: 2,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 8),
+                        ),
+                        const SizedBox(height: 16),
 
-                          _buildSectionTitle('알람 내용'),
-                          _buildTextField(
-                            controller: _contentsController,
-                            hint: '알람 내용을 입력하세요.',
-                          ),
-                          const SizedBox(height: 8),
+                        // 시간 설정 카드
+                        _buildCard(
+                          icon: Icons.access_time,
+                          title: '시간 설정',
+                          child: _buildTimePicker(),
+                        ),
+                        const SizedBox(height: 16),
 
-                          _buildSectionTitle('날짜 설정'),
-                          _buildDatePicker(),
-                          const SizedBox(height: 8),
+                        // 요일 설정 카드
+                        _buildCard(
+                          icon: Icons.calendar_today_outlined,
+                          title: '반복 요일',
+                          child: _buildDaySelector(),
+                        ),
+                        const SizedBox(height: 24),
 
-                          _buildSectionTitle('시간 설정'),
-                          _buildTimePicker(),
-                          const SizedBox(height: 8),
-
-                          _buildSectionTitle('요일 설정'),
-                          _buildDaySelector(),
-                          const SizedBox(height: 20),
-
-                          _buildButtons(),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
+                        // 버튼
+                        _buildButtons(),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   );
                 },
@@ -290,42 +288,154 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 10, top: 10, bottom: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        color: cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.arrow_back_ios_new, color: textPrimaryColor),
+            splashRadius: 24,
+          ),
+          const Expanded(
+            child: Text(
+              '알람 수정',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: textPrimaryColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required IconData icon,
+    required String title,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: primaryColor, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: textPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: Colors.grey.shade200),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: child,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDropdown(List<MessageProfileModel> users) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<MessageProfileModel>(
           isExpanded: true,
-          hint: const Text(
-            '보호 대상 아이디를 선택해주세요.',
-            style: TextStyle(color: Colors.grey),
+          hint: Text(
+            '보호 대상을 선택해주세요',
+            style: TextStyle(color: textSecondaryColor, fontSize: 15),
           ),
           value: _selectedUser,
+          icon: Icon(Icons.keyboard_arrow_down, color: primaryColor),
           items: users.map((user) {
             return DropdownMenuItem(
               value: user,
-              child: Text(
-                '${user.displayName} ${user.id}',
-                style: const TextStyle(fontSize: 16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: primaryColor.withValues(alpha: 0.1),
+                    child: Text(
+                      user.displayName.isNotEmpty ? user.displayName[0] : '?',
+                      style: TextStyle(
+                        color: primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        user.displayName,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: textPrimaryColor,
+                        ),
+                      ),
+                      Text(
+                        'ID: ${user.id}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: textSecondaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             );
           }).toList(),
@@ -340,188 +450,316 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
+    required IconData icon,
+    int maxLines = 1,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: Colors.grey),
-          filled: true,
-          fillColor: Colors.white,
-          border: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFFD8D8D8)),
-          ),
-          enabledBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Color(0xFFD8D8D8)),
-          ),
-          focusedBorder: const UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.text,
+      enableIMEPersonalizedLearning: true,
+      maxLines: maxLines,
+      style: const TextStyle(fontSize: 15, color: textPrimaryColor),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: textSecondaryColor.withValues(alpha: 0.7)),
+        prefixIcon: Icon(icon, color: primaryColor, size: 22),
+        filled: true,
+        fillColor: backgroundColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDatePicker() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      height: 173,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: CupertinoDatePicker(
-        mode: CupertinoDatePickerMode.date,
-        initialDateTime: _selectedDate,
-        minimumDate: DateTime.now().subtract(const Duration(days: 1)),
-        maximumDate: DateTime.now().add(const Duration(days: 365)),
-        onDateTimeChanged: (DateTime newDate) {
-          setState(() {
-            _selectedDate = newDate;
-            _isDateChanged = true;
-          });
-        },
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: primaryColor, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
 
   Widget _buildTimePicker() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      height: 173,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
+        gradient: LinearGradient(
+          colors: [
+            primaryColor.withValues(alpha: 0.05),
+            primaryLightColor.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: CupertinoDatePicker(
-        mode: CupertinoDatePickerMode.time,
-        initialDateTime: _selectedTime,
-        use24hFormat: true,
-        onDateTimeChanged: (DateTime newTime) {
-          setState(() {
-            _selectedTime = newTime;
-          });
-        },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildTimeSpinner(
+            value: _selectedHour,
+            maxValue: 23,
+            onChanged: (value) => setState(() => _selectedHour = value),
+            label: '시간',
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                const SizedBox(height: 28),
+                Text(
+                  ':',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w300,
+                    color: primaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _buildTimeSpinner(
+            value: _selectedMinute,
+            maxValue: 59,
+            onChanged: (value) => setState(() => _selectedMinute = value),
+            label: '분',
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildTimeSpinner({
+    required int value,
+    required int maxValue,
+    required Function(int) onChanged,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: textSecondaryColor,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: 90,
+          height: 140,
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: 0.15),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ListWheelScrollView.useDelegate(
+            itemExtent: 46,
+            perspective: 0.003,
+            diameterRatio: 1.3,
+            physics: const FixedExtentScrollPhysics(),
+            controller: FixedExtentScrollController(initialItem: value),
+            onSelectedItemChanged: onChanged,
+            childDelegate: ListWheelChildBuilderDelegate(
+              childCount: maxValue + 1,
+              builder: (context, index) {
+                final isSelected = index == value;
+                return Center(
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 150),
+                    style: TextStyle(
+                      fontSize: isSelected ? 28 : 18,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w400,
+                      color: isSelected ? primaryColor : Colors.grey.shade400,
+                    ),
+                    child: Text(index.toString().padLeft(2, '0')),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildDaySelector() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(7, (index) {
-          final isSelected = _selectedDays[index];
-          final isWeekend = index == 5 || index == 6;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: List.generate(7, (index) {
+        final isSelected = _selectedDays[index];
+        final isWeekend = index == 5 || index == 6;
 
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedDays[index] = !_selectedDays[index];
-              });
-            },
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFF258AE4)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF258AE4)
-                      : const Color(0xFFD8D8D8),
-                  width: 2,
-                ),
-              ),
-              child: Center(
-                child: Text(
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedDays[index] = !_selectedDays[index];
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            width: isSelected ? 46 : 42,
+            height: isSelected ? 46 : 42,
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? LinearGradient(
+                      colors: [primaryColor, primaryLightColor],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : backgroundColor,
+              borderRadius: BorderRadius.circular(isSelected ? 14 : 12),
+              border: isSelected
+                  ? Border.all(color: Colors.white, width: 2)
+                  : Border.all(color: Colors.grey.shade300, width: 1.5),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.5),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Text(
                   _dayLabels[index],
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: isSelected ? 15 : 14,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
                         ? Colors.white
                         : isWeekend
-                            ? Colors.red
-                            : Colors.black,
+                            ? Colors.red.shade400
+                            : textPrimaryColor,
                   ),
                 ),
-              ),
+                if (isSelected)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.check,
+                        size: 10,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-          );
-        }),
-      ),
+          ),
+        );
+      }),
     );
   }
 
   Widget _buildButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Center(
-                  child: Text(
-                    '취소',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+    return Row(
+      children: [
+        // 취소 버튼
+        Expanded(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(
+                  '취소',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: textSecondaryColor,
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: GestureDetector(
-              onTap: _isSubmitting ? null : _saveAlarm,
-              child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF258AE4),
-                  borderRadius: BorderRadius.circular(8),
+        ),
+        const SizedBox(width: 12),
+        // 수정 버튼
+        Expanded(
+          flex: 2,
+          child: GestureDetector(
+            onTap: _isSubmitting ? null : _saveAlarm,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 54,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _isSubmitting
+                      ? [Colors.grey.shade400, Colors.grey.shade500]
+                      : [primaryColor, primaryLightColor],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-                child: Center(
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          '수정',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: _isSubmitting
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: primaryColor.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
-                ),
+                      ],
+              ),
+              child: Center(
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.save_outlined, color: Colors.white, size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            '수정 완료',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
