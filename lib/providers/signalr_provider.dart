@@ -38,6 +38,13 @@ class SignalRProvider with ChangeNotifier {
   void _onMessageReceived(HubModel hubModel) {
     _lastMessage = hubModel;
 
+    debugPrint('SignalR Provider: 메시지 수신 - mode: ${hubModel.mode}, groupName: ${hubModel.groupName}');
+
+    // 인증 응답 메시지 ('U' = 85)
+    if (hubModel.mode == 85) {
+      debugPrint('SignalR Provider: 인증 응답(U) 수신 - json: ${hubModel.json}');
+    }
+
     // Dialog 메시지인 경우 파싱
     if (hubModel.isDialog && hubModel.json != null) {
       try {
@@ -49,7 +56,30 @@ class SignalRProvider with ChangeNotifier {
       }
     }
 
+    // 배터리 메시지 처리 ('B' = 66)
+    if (hubModel.isBattery && hubModel.groupName != null) {
+      debugPrint('SignalR Provider: 배터리 수신 - groupName: ${hubModel.groupName}, json: ${hubModel.json}');
+      if (hubModel.json != null) {
+        try {
+          final data = jsonDecode(hubModel.json!);
+          final value = (data['Value'] as num?)?.toDouble();
+          debugPrint('SignalR Provider: 배터리 값 파싱 - value: $value');
+          if (value != null && _onBatteryUpdate != null) {
+            _onBatteryUpdate!(hubModel.groupName!, value);
+          }
+        } catch (e) {
+          debugPrint('SignalR Provider: 배터리 파싱 실패 - $e');
+        }
+      }
+    }
+
     notifyListeners();
+  }
+
+  /// 배터리 업데이트 콜백 등록
+  void Function(String dollId, double value)? _onBatteryUpdate;
+  void setOnBatteryUpdate(void Function(String dollId, double value)? callback) {
+    _onBatteryUpdate = callback;
   }
 
   /// 채팅 메시지 전송

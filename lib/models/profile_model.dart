@@ -67,4 +67,38 @@ class ProfileModel {
       _$ProfileModelFromJson(json);
 
   Map<String, dynamic> toJson() => _$ProfileModelToJson(this);
+
+  ProfileModel copyWith({
+    int? id,
+    String? protectedPerson,
+    String? address,
+    String? protectedPhone,
+    bool? male,
+    String? phone,
+    String? agency,
+    double? latitude,
+    double? longitude,
+    String? formattedAddress,
+    String? administrativeAreaLevel,
+    String? locality,
+    String? sublocalityLevel,
+    String? name,
+  }) {
+    return ProfileModel(
+      id: id ?? this.id,
+      protectedPerson: protectedPerson ?? this.protectedPerson,
+      address: address ?? this.address,
+      protectedPhone: protectedPhone ?? this.protectedPhone,
+      male: male ?? this.male,
+      phone: phone ?? this.phone,
+      agency: agency ?? this.agency,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      formattedAddress: formattedAddress ?? this.formattedAddress,
+      administrativeAreaLevel: administrativeAreaLevel ?? this.administrativeAreaLevel,
+      locality: locality ?? this.locality,
+      sublocalityLevel: sublocalityLevel ?? this.sublocalityLevel,
+      name: name ?? this.name,
+    );
+  }
 }

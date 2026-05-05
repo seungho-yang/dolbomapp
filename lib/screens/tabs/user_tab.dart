@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/message_profile_model.dart';
+import '../../services/api_service.dart';
+import '../../services/global_user_info.dart';
+import '../profile/profile_edit_screen.dart';
 
 class UserTab extends StatefulWidget {
   const UserTab({super.key});
@@ -14,8 +18,9 @@ class _UserTabState extends State<UserTab> {
   final TextEditingController _searchController = TextEditingController();
 
   List<MessageProfileModel> _filteredUsers = [];
-  int _currentPage = 1;
-  final int _itemsPerPage = 10;
+
+  // 정렬 옵션: true = 낮은순, false = 높은순
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -37,22 +42,17 @@ class _UserTabState extends State<UserTab> {
             .where((user) => user.id?.contains(query) ?? false)
             .toList();
       }
-      _currentPage = 1; // 검색 시 첫 페이지로 리셋
+      _sortUsers();
     });
   }
 
-  int get _totalPages {
-    return (_filteredUsers.length / _itemsPerPage).ceil();
-  }
-
-  List<MessageProfileModel> get _displayedUsers {
-    if (_filteredUsers.isEmpty) return [];
-    final startIndex = (_currentPage - 1) * _itemsPerPage;
-    final endIndex = startIndex + _itemsPerPage;
-    return _filteredUsers.sublist(
-      startIndex,
-      endIndex > _filteredUsers.length ? _filteredUsers.length : endIndex,
-    );
+  /// 인형번호순 정렬
+  void _sortUsers() {
+    _filteredUsers.sort((a, b) {
+      final idA = int.tryParse(a.id ?? '0') ?? 0;
+      final idB = int.tryParse(b.id ?? '0') ?? 0;
+      return _sortAscending ? idA.compareTo(idB) : idB.compareTo(idA);
+    });
   }
 
   @override
@@ -62,6 +62,7 @@ class _UserTabState extends State<UserTab> {
         // 필터링된 목록 초기화 (Provider 데이터 변경 시)
         if (_filteredUsers.isEmpty && userProvider.users.isNotEmpty) {
           _filteredUsers = List.from(userProvider.users);
+          _sortUsers();
         }
 
         return Scaffold(
@@ -158,6 +159,57 @@ class _UserTabState extends State<UserTab> {
                 ),
               ),
 
+              // 정렬 옵션
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '전체 ${_filteredUsers.length}명',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<bool>(
+                          value: _sortAscending,
+                          isDense: true,
+                          icon: const Icon(Icons.arrow_drop_down, size: 20),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
+                          items: const [
+                            DropdownMenuItem<bool>(
+                              value: true,
+                              child: Text('번호 낮은순'),
+                            ),
+                            DropdownMenuItem<bool>(
+                              value: false,
+                              child: Text('번호 높은순'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _sortAscending = value;
+                                _sortUsers();
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               // 사용자 목록
               Expanded(
                 child: userProvider.isLoading
@@ -184,7 +236,7 @@ class _UserTabState extends State<UserTab> {
                               ],
                             ),
                           )
-                        : _displayedUsers.isEmpty
+                        : _filteredUsers.isEmpty
                             ? const Center(
                                 child: Text(
                                   '보호대상자가 없습니다',
@@ -195,25 +247,14 @@ class _UserTabState extends State<UserTab> {
                                 ),
                               )
                             : ListView.builder(
-                                padding: const EdgeInsets.only(bottom: 20),
-                                itemCount: _displayedUsers.length,
+                                padding: const EdgeInsets.only(bottom: 70),
+                                itemCount: _filteredUsers.length,
                                 itemBuilder: (context, index) {
-                                  return _buildUserItem(_displayedUsers[index]);
+                                  return _buildUserItem(_filteredUsers[index]);
                                 },
                               ),
               ),
 
-              // 페이지네이션
-              if (_filteredUsers.isNotEmpty && _totalPages > 1)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: _buildPageNumbers(),
-                  ),
-                ),
-
-              const SizedBox(height: 60), // 하단 네비게이션 여백
             ],
           ),
         );
@@ -221,67 +262,211 @@ class _UserTabState extends State<UserTab> {
     );
   }
 
-  List<Widget> _buildPageNumbers() {
-    List<Widget> pageButtons = [];
-    int startPage = (_currentPage - 2).clamp(1, _totalPages);
-    int endPage = (_currentPage + 2).clamp(1, _totalPages);
+  Future<void> _showDeleteDialog(MessageProfileModel user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${user.displayName} (${user.id ?? ''})'),
+        content: const Text('보호대상자를 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
 
-    // 시작 부분에 ... 추가
-    if (startPage > 1) {
-      pageButtons.add(_buildPageButton(1));
-      if (startPage > 2) {
-        pageButtons.add(const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Text('...', style: TextStyle(color: Colors.grey)),
-        ));
+    if (confirmed == true && mounted) {
+      final authProvider = context.read<AuthProvider>();
+      final userIdStr = authProvider.userId ?? GlobalUserInfo.instance.userId;
+      final kakaoId = int.tryParse(userIdStr ?? '');
+      final aiId = user.id;
+
+      debugPrint('삭제 정보 - userId: $userIdStr, kakaoId: $kakaoId, aiId: $aiId');
+
+      if (kakaoId == null || aiId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('삭제에 필요한 정보가 없습니다. (userId: ${authProvider.userId}, aiId: $aiId)'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      try {
+        final apiService = ApiService();
+        final response = await apiService.deleteMatching(aiId, kakaoId);
+        if (!mounted) return;
+
+        final success = response.statusCode == 200;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success
+                ? "'${user.displayName}' 보호대상자가 삭제되었습니다."
+                : '삭제에 실패했습니다.'),
+            backgroundColor: success ? Colors.green : Colors.red,
+          ),
+        );
+
+        if (success) {
+          final userProvider = context.read<UserProvider>();
+          await userProvider.refresh(kakaoId!);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('삭제 실패: $e'), backgroundColor: Colors.red),
+        );
       }
     }
-
-    // 페이지 번호들
-    for (int i = startPage; i <= endPage; i++) {
-      pageButtons.add(_buildPageButton(i));
-    }
-
-    // 끝 부분에 ... 추가
-    if (endPage < _totalPages) {
-      if (endPage < _totalPages - 1) {
-        pageButtons.add(const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: Text('...', style: TextStyle(color: Colors.grey)),
-        ));
-      }
-      pageButtons.add(_buildPageButton(_totalPages));
-    }
-
-    return pageButtons;
   }
 
-  Widget _buildPageButton(int pageNumber) {
-    final isCurrentPage = pageNumber == _currentPage;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentPage = pageNumber;
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isCurrentPage ? Colors.blue : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isCurrentPage ? Colors.blue : Colors.grey.shade300,
-            width: 1,
-          ),
+  void _showUserMenu(MessageProfileModel user) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
         ),
-        child: Text(
-          '$pageNumber',
-          style: TextStyle(
-            color: isCurrentPage ? Colors.white : Colors.black,
-            fontWeight: isCurrentPage ? FontWeight.bold : FontWeight.normal,
-            fontSize: 14,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 상단: 인형 이미지 + 이름
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(15),
+                  topRight: Radius.circular(15),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.asset(
+                      user.botImagePath,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF258AE4).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.smart_toy,
+                            color: Color(0xFF258AE4),
+                            size: 24,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      '${user.displayName} ${user.id ?? ''}',
+                      style: const TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // 하단: 수정하기, 삭제하기 버튼
+            Container(
+              width: double.infinity,
+              height: 60,
+              decoration: const BoxDecoration(
+                color: Color(0xFF258AE4),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(15),
+                  bottomRight: Radius.circular(15),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProfileEditScreen(user: user),
+                          ),
+                        );
+                      },
+                      child: SizedBox(
+                        height: 60,
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/update_button.png',
+                            height: 40,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Text(
+                                '수정하기',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showDeleteDialog(user);
+                      },
+                      child: SizedBox(
+                        height: 60,
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/delete_button.png',
+                            height: 40,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Text(
+                                '삭제하기',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -349,66 +534,57 @@ class _UserTabState extends State<UserTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        user.displayName,
+                        user.id ?? '',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.black,
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (user.state ?? 0) > 0
-                              ? Colors.green.shade100
-                              : Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          (user.state ?? 0) > 0 ? '활성' : '비활성',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: (user.state ?? 0) > 0
-                                ? Colors.green.shade700
-                                : Colors.grey.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                      const SizedBox(width: 8),
+                      Image.asset(
+                        batteryImage,
+                        width: 28,
+                        height: 28,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.battery_unknown,
+                            size: 28,
+                            color: Colors.grey,
+                          );
+                        },
                       ),
+                      // TODO: 활성/비활성 표시 (추후 구현)
+                      // const Spacer(),
+                      // Builder(builder: (context) {
+                      //   final userProvider = context.watch<UserProvider>();
+                      //   final isActive = user.id != null && userProvider.isDollActive(user.id!);
+                      //   ...
+                      // }),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '인형 번호: ${user.id ?? ''}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
+                    user.displayName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(width: 8),
-
-            // 배터리 이미지
-            Image.asset(
-              batteryImage,
-              width: 32,
-              height: 32,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(
-                  Icons.battery_unknown,
-                  size: 32,
-                  color: Colors.grey,
-                );
-              },
+            // 더보기 메뉴
+            GestureDetector(
+              onTap: () => _showUserMenu(user),
+              child: const Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(Icons.more_vert, color: Colors.grey, size: 24),
+              ),
             ),
           ],
         ),

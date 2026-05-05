@@ -56,7 +56,7 @@ class MessageProfileModel {
   final int? port;
 
   @JsonKey(name: 'profile')
-  final ProfileModel? profile;
+  ProfileModel? profile;
 
   // 서버에서 타입이 다양하게 올 수 있으므로 변환 처리
   static String? _dynamicToString(dynamic value) {

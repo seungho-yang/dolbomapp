@@ -20,7 +20,7 @@ class _AutoLoginScreenState extends State<AutoLoginScreen> {
   }
 
   // 로그인 바이패스 플래그 (개발용) - true면 바로 메인화면으로
-  static const bool _bypassLogin = true;
+  static const bool _bypassLogin = false;
   // 테스트용 userId (실제 카카오 사용자 ID: 2285656840)
   static const String _testUserId = TestUserIds.kakaoUser;
 

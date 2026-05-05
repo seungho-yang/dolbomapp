@@ -63,6 +63,9 @@ dependencies:
   # SignalR (실시간 통신)
   signalr_netcore: ^1.3.7
 
+  # URL 런처 (전화 걸기, 웹 브라우저 등)
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

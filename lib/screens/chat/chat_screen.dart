@@ -526,14 +526,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   /// 메시지 버블 위젯
-  /// type 0: 사용자 메시지 (오른쪽)
-  /// type 1: 타인 메시지 (왼쪽)
-  /// type 2: 봇 메시지 (왼쪽)
-  /// type 3: 응급 메시지 (왼쪽, 빨간색)
-  /// type 4: 알람 메시지 (왼쪽)
-  /// type 6: 활성 메시지 (왼쪽)
+  /// type 0: 어르신(사용자) 메시지 (왼쪽, 흰색)
+  /// type 1: 타인 메시지 (오른쪽)
+  /// type 2: 봇(인형) 메시지 (오른쪽, 파란색)
+  /// type 3: 응급 메시지 (오른쪽, 빨간색)
+  /// type 4: 알람 메시지 (오른쪽)
+  /// type 6: 활성 메시지 (오른쪽)
   Widget _buildMessageBubble(MessageChatModel message) {
-    // type 0: 사용자 메시지 (오른쪽), 나머지: 왼쪽
+    // type 0: 어르신 메시지 (왼쪽), 나머지: 인형 메시지 (오른쪽)
     final isUser = message.type == 0;
     final isDanger = message.isDangerousWords ?? false;
     final isEmergency = message.type == 3;
@@ -542,55 +542,32 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            isUser ? MainAxisAlignment.start : MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // AI 아바타 (왼쪽)
-          if (!isUser) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.asset(
-                _getBotImage(widget.bot),
-                width: 32,
-                height: 32,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.smart_toy,
-                        color: Colors.blue, size: 20),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
+          // 어르신 메시지 여백 (왼쪽)
+          if (isUser) const SizedBox(width: 8),
 
           // 메시지 내용
           Flexible(
             child: Column(
               crossAxisAlignment:
-                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  isUser ? CrossAxisAlignment.start : CrossAxisAlignment.end,
               children: [
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: isUser
-                        ? const Color(0xFF4A90D9)
+                        ? Colors.white
                         : isDanger
                             ? Colors.red.shade100
-                            : Colors.white,
+                            : const Color(0xFF4A90D9),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isUser ? 16 : 4),
-                      bottomRight: Radius.circular(isUser ? 4 : 16),
+                      bottomLeft: Radius.circular(isUser ? 4 : 16),
+                      bottomRight: Radius.circular(isUser ? 16 : 4),
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -631,10 +608,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         style: TextStyle(
                           fontSize: 15,
                           color: isUser
-                              ? Colors.white
+                              ? Colors.black87
                               : (isDanger || isEmergency)
                                   ? Colors.red.shade900
-                                  : Colors.black87,
+                                  : Colors.white,
                         ),
                       ),
                     ],
@@ -652,8 +629,31 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // 사용자 메시지 여백 (오른쪽)
-          if (isUser) const SizedBox(width: 8),
+          // 인형 아바타 (오른쪽)
+          if (!isUser) ...[
+            const SizedBox(width: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                _getBotImage(widget.bot),
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.smart_toy,
+                        color: Colors.blue, size: 20),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );

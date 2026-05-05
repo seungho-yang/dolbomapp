@@ -26,6 +26,7 @@ class GlobalUserInfo {
   String? _email;
   String? _nickname;
   String? _profileImageUrl;
+  String? _phone;
   bool _isTestMode = false;
 
   // Getters
@@ -33,6 +34,7 @@ class GlobalUserInfo {
   String? get email => _email;
   String? get nickname => _nickname;
   String? get profileImageUrl => _profileImageUrl;
+  String? get phone => _phone;
   bool get isTestMode => _isTestMode;
 
   /// userId를 int로 변환하여 반환 (API 호출용)
@@ -45,6 +47,12 @@ class GlobalUserInfo {
   void setUserId(String userId) {
     _userId = userId;
     debugPrint('GlobalUserInfo: userId 설정됨 - $userId');
+  }
+
+  /// 전화번호 설정
+  void setPhone(String? phone) {
+    _phone = phone;
+    debugPrint('GlobalUserInfo: phone 설정됨 - $phone');
   }
 
   /// 카카오 사용자 정보 설정
@@ -78,6 +86,7 @@ class GlobalUserInfo {
     _email = null;
     _nickname = null;
     _profileImageUrl = null;
+    _phone = null;
     _isTestMode = false;
     debugPrint('GlobalUserInfo: 사용자 정보 초기화됨');
   }

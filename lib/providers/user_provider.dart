@@ -14,12 +14,16 @@ class UserProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isLoaded = false; // 최초 로드 여부
   String? _error;
+  final Set<String> _activeDollIds = {}; // 배터리 수신된 인형 ID
 
   List<MessageProfileModel> get users => _users;
   ProfileModel? get selectedUser => _selectedUser;
   bool get isLoading => _isLoading;
   bool get isLoaded => _isLoaded;
   String? get error => _error;
+
+  /// 배터리 수신 여부로 활성 판단
+  bool isDollActive(String dollId) => _activeDollIds.contains(dollId);
 
   /// 보호대상자 목록 조회 (Home.java 생성자의 API 호출과 동일)
   /// GET /app?id={userId}
@@ -92,6 +96,7 @@ class UserProvider with ChangeNotifier {
 
   /// 배터리 상태 업데이트 (SignalR mode 'B' 수신 시)
   void updateBattery(String dollId, double value) {
+    _activeDollIds.add(dollId);
     for (var user in _users) {
       if (user.id == dollId) {
         if (value > 0.9) {
@@ -131,13 +136,19 @@ class UserProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         // 로컬 데이터 업데이트
-        final id = profileData['id']?.toString();
-        final name = profileData['name']?.toString();
-        if (id != null && name != null) {
+        final profileId = profileData['id'];
+        if (profileId != null) {
           for (var user in _users) {
-            if (user.id == id) {
-              // MessageProfileModel은 immutable이므로 새로 만들어야 함
-              // 여기서는 간단히 profile의 name만 변경 로직 필요시 추가
+            if (user.profile?.id == profileId) {
+              user.profile = user.profile!.copyWith(
+                name: profileData['name'] as String?,
+                protectedPerson: profileData['protectedPerson'] as String?,
+                protectedPhone: profileData['protectedPhone'] as String?,
+                phone: profileData['phone'] as String?,
+                address: profileData['address'] as String?,
+                agency: profileData['agency'] as String?,
+                male: profileData['male'] as bool?,
+              );
               break;
             }
           }

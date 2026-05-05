@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "769328492916",
+    "firebase_url": "https://doldori-app.firebaseio.com",
+    "project_id": "doldori-app",
+    "storage_bucket": "doldori-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:769328492916:android:e57e690d5182cd5bfa3c21",
+        "android_client_info": {
+          "package_name": "com.doldori"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "769328492916-nc57ub2chjp0i1025kq6lb6jtrbcqbj6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1vZpPepRucoyKbTmX-uzRgMXxm5DdBvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "769328492916-nc57ub2chjp0i1025kq6lb6jtrbcqbj6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

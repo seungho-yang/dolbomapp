@@ -25,6 +25,9 @@ class _MessageTabState extends State<MessageTab> {
   List<MessageProfileModel> _filteredMessages = [];
   List<MessageProfileModel> _sortedMessages = [];
 
+  // 정렬 옵션: true = 낮은순, false = 높은순
+  bool _sortAscending = true;
+
   @override
   void initState() {
     super.initState();
@@ -77,16 +80,18 @@ class _MessageTabState extends State<MessageTab> {
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
+  /// 인형번호순으로 정렬
+  void _sortMessages() {
+    _sortedMessages.sort((a, b) {
+      final idA = int.tryParse(a.id ?? '0') ?? 0;
+      final idB = int.tryParse(b.id ?? '0') ?? 0;
+      return _sortAscending ? idA.compareTo(idB) : idB.compareTo(idA);
+    });
+  }
+
   /// 최근 대화 시간 기준으로 정렬 (Java Message.java의 arrayList.sort와 동일)
   void _sortMessagesByTime() {
-    _sortedMessages.sort((a, b) {
-      // lastTime이 있는 항목을 위로
-      if (a.lastTime == null && b.lastTime == null) return 0;
-      if (a.lastTime == null) return 1;
-      if (b.lastTime == null) return -1;
-      // 최신 메시지가 위로 (내림차순)
-      return b.lastTime!.compareTo(a.lastTime!);
-    });
+    _sortMessages();
   }
 
   /// 검색 필터 적용
@@ -152,7 +157,7 @@ class _MessageTabState extends State<MessageTab> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
               // 검색창 (Java Message.java의 editSearch와 동일)
               Padding(
@@ -180,6 +185,56 @@ class _MessageTabState extends State<MessageTab> {
                       _filterMessages(value, userProvider.users);
                     },
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // 정렬 옵션
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<bool>(
+                          value: _sortAscending,
+                          isDense: true,
+                          icon: const Icon(Icons.arrow_drop_down, size: 20),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
+                          items: const [
+                            DropdownMenuItem<bool>(
+                              value: true,
+                              child: Text('번호 낮은순'),
+                            ),
+                            DropdownMenuItem<bool>(
+                              value: false,
+                              child: Text('번호 높은순'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _sortAscending = value;
+                                _sortMessages();
+                                _applyFilter(_searchController.text);
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 

@@ -26,6 +26,9 @@ class HubModel {
 
   /// Notification 모드 여부 ('N' = 78)
   bool get isNotification => mode == 78;
+
+  /// Battery 모드 여부 ('B' = 66)
+  bool get isBattery => mode == 66;
 }
 
 /// SignalR을 통해 수신되는 메시지 모델

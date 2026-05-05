@@ -366,8 +366,15 @@ class _DollSearchScreenState extends State<DollSearchScreen> {
       builder: (context, signalRProvider, child) {
         // 'U' 모드 메시지 처리 (인증 응답)
         final lastMessage = signalRProvider.lastMessage;
+
+        // 디버그 로그
+        if (lastMessage != null) {
+          debugPrint('DollSearch: SignalR 메시지 수신 - mode: ${lastMessage.mode}, isWaitingAuth: $_isWaitingAuth');
+        }
+
         if (lastMessage != null && lastMessage.mode == 85 && _isWaitingAuth) {
           // 85 = 'U'
+          debugPrint('DollSearch: 인증 응답 처리 시작');
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _handleAuthResponse(lastMessage);
           });

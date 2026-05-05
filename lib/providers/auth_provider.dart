@@ -77,6 +77,15 @@ class AuthProvider with ChangeNotifier {
         final kakaoUser = await _kakaoLoginService.getUserInfo();
         if (kakaoUser != null) {
           _userId = kakaoUser.id.toString();
+
+          // GlobalUserInfo 싱글톤에도 설정 (Provider 없이 전역 접근 가능)
+          GlobalUserInfo.instance.setKakaoUserInfo(
+            userId: _userId!,
+            email: kakaoUser.kakaoAccount?.email,
+            nickname: kakaoUser.kakaoAccount?.profile?.nickname,
+            profileImageUrl: kakaoUser.kakaoAccount?.profile?.profileImageUrl,
+          );
+
           debugPrint('자동 로그인 성공: $_userId');
         }
       }

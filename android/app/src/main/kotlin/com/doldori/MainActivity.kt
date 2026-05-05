@@ -1,4 +1,4 @@
-package com.example.dolbom_e_eum
+package com.doldori
 
 import io.flutter.embedding.android.FlutterActivity
 

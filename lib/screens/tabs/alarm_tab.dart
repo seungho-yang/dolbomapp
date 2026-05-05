@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/alarm_model.dart';
 import '../../providers/alarm_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../services/global_user_info.dart';
 import '../alarm/alarm_add_screen.dart';
 import '../alarm/alarm_setting_screen.dart';
 
-/// AlarmTab - 알람 목록 화면
-/// Java의 Alarm.java Fragment와 동일한 기능
+/// AlarmTab - 알람 목록 화면 (인형별 그룹)
 class AlarmTab extends StatefulWidget {
   const AlarmTab({super.key});
 
@@ -16,9 +16,15 @@ class AlarmTab extends StatefulWidget {
 }
 
 class _AlarmTabState extends State<AlarmTab> {
-  final TextEditingController _searchController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  // 선택된 인형 ai번호 (null이면 인형 목록 표시)
+  int? _selectedAi;
+  String? _selectedName;
 
+  // 정렬 옵션: true = 낮은순, false = 높은순
+  bool _sortAscending = true;
+
+  // 검색
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
@@ -32,39 +38,29 @@ class _AlarmTabState extends State<AlarmTab> {
   @override
   void dispose() {
     _searchController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _loadAlarms() async {
     final alarmProvider = Provider.of<AlarmProvider>(context, listen: false);
-    // GlobalUserInfo 사용 (MainPage와 동일하게)
     final userIdStr = GlobalUserInfo.instance.userId;
     final userId = int.tryParse(userIdStr ?? '') ?? 0;
 
-    debugPrint('AlarmTab: 알람 로드 시도 - userId: $userId');
-
     if (userId > 0) {
       await alarmProvider.loadAlarms(userId);
-    } else {
-      debugPrint('AlarmTab: userId가 유효하지 않음 ($userIdStr)');
     }
   }
 
-  /// 알람 추가 화면으로 이동
   Future<void> _navigateToAddAlarm() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AlarmAddScreen()),
     );
-
     if (result == true) {
-      // 알람이 추가되면 목록 새로고침
       _loadAlarms();
     }
   }
 
-  /// 알람 수정 화면으로 이동
   Future<void> _navigateToEditAlarm(AlarmModel alarm) async {
     await Navigator.push(
       context,
@@ -72,11 +68,8 @@ class _AlarmTabState extends State<AlarmTab> {
         builder: (context) => AlarmSettingScreen(alarm: alarm),
       ),
     );
-    // 수정은 Provider에서 로컬 목록을 직접 업데이트하므로
-    // 추가 로드 불필요 (서버 캐시 문제 방지)
   }
 
-  /// 알람 삭제 확인 다이얼로그
   Future<void> _showDeleteDialog(AlarmModel alarm) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -116,7 +109,6 @@ class _AlarmTabState extends State<AlarmTab> {
     }
   }
 
-  /// 수정/삭제 다이얼로그 (Java alarm_alert_view.xml과 동일)
   void _showActionDialog(AlarmModel alarm) {
     showDialog(
       context: context,
@@ -127,7 +119,6 @@ class _AlarmTabState extends State<AlarmTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 상단: 인형 이미지 + 이름 (alarm_alert_view.xml과 동일)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
@@ -141,7 +132,6 @@ class _AlarmTabState extends State<AlarmTab> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 인형 이미지 - 40x40dp
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: Image.asset(
@@ -167,7 +157,6 @@ class _AlarmTabState extends State<AlarmTab> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // 인형 이름 + AI 번호 - 25dp bold
                   Flexible(
                     child: Text(
                       '${alarm.name ?? ''} ${alarm.ai ?? ''}',
@@ -182,7 +171,6 @@ class _AlarmTabState extends State<AlarmTab> {
                 ],
               ),
             ),
-            // 하단: 수정하기, 삭제하기 버튼 (가로 배치) - #258AE4 배경
             Container(
               width: double.infinity,
               height: 60,
@@ -195,7 +183,6 @@ class _AlarmTabState extends State<AlarmTab> {
               ),
               child: Row(
                 children: [
-                  // 수정하기 버튼
                   Expanded(
                     child: InkWell(
                       onTap: () {
@@ -223,7 +210,6 @@ class _AlarmTabState extends State<AlarmTab> {
                       ),
                     ),
                   ),
-                  // 삭제하기 버튼
                   Expanded(
                     child: InkWell(
                       onTap: () {
@@ -260,7 +246,6 @@ class _AlarmTabState extends State<AlarmTab> {
     );
   }
 
-  /// 알람 ON/OFF 토글
   Future<void> _toggleAlarm(AlarmModel alarm) async {
     if (alarm.id == null) return;
 
@@ -279,58 +264,38 @@ class _AlarmTabState extends State<AlarmTab> {
     }
   }
 
-  /// bot 값에 따른 이미지 경로 반환
   String _getBotImage(int? bot) {
     switch (bot) {
-      case 8:
-        return 'assets/images/mapodong.png';
-      case 13:
-        return 'assets/images/kingstrawberry.png';
-      case 14:
-        return 'assets/images/dongdaemun.png';
-      case 17:
-        return 'assets/images/haeon.png';
-      case 19:
-        return 'assets/images/hamo.png';
-      case 20:
-        return 'assets/images/atongii.png';
-      case 22:
-        return 'assets/images/gumdoll.png';
-      case 23:
-        return 'assets/images/gumsunii.png';
-      case 24:
-        return 'assets/images/bamangii.png';
-      case 25:
-        return 'assets/images/sangii.png';
-      case 26:
-        return 'assets/images/pepper.png';
-      case 27:
-        return 'assets/images/organic.png';
-      case 28:
-        return 'assets/images/future.png';
-      case 30:
-        return 'assets/images/sun_on.png';
-      case 31:
-        return 'assets/images/jangsangii.png';
+      case 8: return 'assets/images/mapodong.png';
+      case 13: return 'assets/images/kingstrawberry.png';
+      case 14: return 'assets/images/dongdaemun.png';
+      case 17: return 'assets/images/haeon.png';
+      case 19: return 'assets/images/hamo.png';
+      case 20: return 'assets/images/atongii.png';
+      case 22: return 'assets/images/gumdoll.png';
+      case 23: return 'assets/images/gumsunii.png';
+      case 24: return 'assets/images/bamangii.png';
+      case 25: return 'assets/images/sangii.png';
+      case 26: return 'assets/images/pepper.png';
+      case 27: return 'assets/images/organic.png';
+      case 28: return 'assets/images/future.png';
+      case 30: return 'assets/images/sun_on.png';
+      case 31: return 'assets/images/jangsangii.png';
       case 32:
-      case 33:
-        return 'assets/images/jadu.png';
-      case 34:
-        return 'assets/images/rumi.png';
-      case 35:
-        return 'assets/images/gold_dragon.png';
-      default:
-        return 'assets/images/bokdongii.png';
+      case 33: return 'assets/images/jadu.png';
+      case 34: return 'assets/images/rumi.png';
+      case 35: return 'assets/images/gold_dragon.png';
+      default: return 'assets/images/bokdongii.png';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9), // alarm_list_background
+      backgroundColor: const Color(0xFFF9F9F9),
       body: Column(
         children: [
-          // 배너 이미지 - Java fragment_alarm.xml과 동일
+          // 배너
           Container(
             padding: const EdgeInsets.all(10),
             child: Image.asset(
@@ -359,61 +324,7 @@ class _AlarmTabState extends State<AlarmTab> {
             ),
           ),
 
-          // 검색창
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Container(
-              height: 45,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFD8D8D8)),
-              ),
-              child: TextField(
-                controller: _searchController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '인형 번호로 검색',
-                  hintStyle: const TextStyle(
-                    color: Color(0xFFD8D8D8),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: Color(0xFFD8D8D8),
-                    size: 20,
-                  ),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(
-                            Icons.clear,
-                            color: Color(0xFFD8D8D8),
-                            size: 18,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-              ),
-            ),
-          ),
-
-          // 알람 목록
+          // 메인 콘텐츠
           Expanded(
             child: Consumer<AlarmProvider>(
               builder: (context, alarmProvider, child) {
@@ -426,13 +337,8 @@ class _AlarmTabState extends State<AlarmTab> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          alarmProvider.error!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
+                        Text(alarmProvider.error!,
+                            style: const TextStyle(fontSize: 16, color: Colors.grey)),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _loadAlarms,
@@ -443,26 +349,15 @@ class _AlarmTabState extends State<AlarmTab> {
                   );
                 }
 
-                // 검색 필터 적용
-                final filteredAlarms = _searchQuery.isEmpty
-                    ? alarmProvider.alarms
-                    : alarmProvider.searchByAi(_searchQuery);
-
-                if (filteredAlarms.isEmpty) {
+                if (alarmProvider.alarms.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.alarm_off,
-                          size: 64,
-                          color: Colors.grey.shade400,
-                        ),
+                        Icon(Icons.alarm_off, size: 64, color: Colors.grey.shade400),
                         const SizedBox(height: 16),
-                        const Text(
-                          '알람이 없습니다',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
+                        const Text('알람이 없습니다',
+                            style: TextStyle(fontSize: 16, color: Colors.grey)),
                         const SizedBox(height: 8),
                         TextButton(
                           onPressed: _navigateToAddAlarm,
@@ -473,17 +368,13 @@ class _AlarmTabState extends State<AlarmTab> {
                   );
                 }
 
-                return RefreshIndicator(
-                  onRefresh: _loadAlarms,
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(bottom: 120),
-                    itemCount: filteredAlarms.length,
-                    itemBuilder: (context, index) {
-                      return _buildAlarmItem(filteredAlarms[index]);
-                    },
-                  ),
-                );
+                // 선택된 인형이 없으면 인형 목록 표시
+                if (_selectedAi == null) {
+                  return _buildDollList(alarmProvider);
+                }
+
+                // 선택된 인형의 알람 목록 표시
+                return _buildAlarmList(alarmProvider);
               },
             ),
           ),
@@ -505,7 +396,372 @@ class _AlarmTabState extends State<AlarmTab> {
     );
   }
 
-  /// 알람 아이템 - Java alarm_list_row.xml과 동일한 구조
+  /// 1단계: 인형 목록 (알람이 있는 인형만)
+  Widget _buildDollList(AlarmProvider alarmProvider) {
+    // 인형별 알람 그룹핑
+    final Map<int, List<AlarmModel>> grouped = {};
+    final Map<int, String> nameMap = {};
+
+    for (final alarm in alarmProvider.alarms) {
+      if (alarm.ai != null) {
+        grouped.putIfAbsent(alarm.ai!, () => []).add(alarm);
+        if (alarm.name != null) {
+          nameMap[alarm.ai!] = alarm.name!;
+        }
+      }
+    }
+
+    // 검색어로 필터링
+    final allAiList = grouped.keys.toList();
+    final filteredAiList = _searchQuery.isEmpty
+        ? allAiList
+        : allAiList
+            .where((ai) => ai.toString().contains(_searchQuery))
+            .toList();
+
+    // 인형번호순 정렬
+    filteredAiList.sort((a, b) => _sortAscending ? a.compareTo(b) : b.compareTo(a));
+    final userProvider = context.watch<UserProvider>();
+
+    return Column(
+      children: [
+        // 검색창
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.shade300,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _searchController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: '인형 번호로 검색',
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontSize: 15,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.grey.shade400,
+                  size: 22,
+                ),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: Colors.grey.shade400,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+          ),
+        ),
+
+        // 정렬 옵션
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<bool>(
+                    value: _sortAscending,
+                    isDense: true,
+                    icon: const Icon(Icons.arrow_drop_down, size: 20),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                    ),
+                    items: const [
+                      DropdownMenuItem<bool>(
+                        value: true,
+                        child: Text('번호 낮은순'),
+                      ),
+                      DropdownMenuItem<bool>(
+                        value: false,
+                        child: Text('번호 높은순'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _sortAscending = value;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 목록
+        Expanded(
+          child: RefreshIndicator(
+      onRefresh: _loadAlarms,
+      child: filteredAiList.isEmpty
+          ? Center(
+              child: Text(
+                _searchQuery.isEmpty ? '알람이 없습니다' : '검색 결과가 없습니다.',
+                style: TextStyle(fontSize: 15, color: Colors.grey.shade500),
+              ),
+            )
+          : ListView.builder(
+        padding: const EdgeInsets.only(bottom: 120),
+        itemCount: filteredAiList.length,
+        itemBuilder: (context, index) {
+          final ai = filteredAiList[index];
+          final alarms = grouped[ai]!;
+          final name = nameMap[ai] ?? '';
+          final onCount = alarms.where((a) => a.on == true).length;
+
+          // UserProvider에서 인형 정보 찾기
+          final user = userProvider.users
+              .where((u) => u.id == ai.toString())
+              .firstOrNull;
+          final botImage = user?.botImagePath ?? _getBotImage(ai);
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedAi = ai;
+                _selectedName = name;
+              });
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.shade200,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // 인형 이미지
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: Image.asset(
+                      botImage,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF258AE4).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: const Icon(Icons.smart_toy,
+                              color: Color(0xFF258AE4), size: 28),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  // 인형 정보
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$ai',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 알람 개수
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${alarms.length}개',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF258AE4),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$onCount개 활성',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 2단계: 선택된 인형의 알람 목록
+  Widget _buildAlarmList(AlarmProvider alarmProvider) {
+    final alarms = alarmProvider.alarms
+        .where((a) => a.ai == _selectedAi)
+        .toList();
+
+    return Column(
+      children: [
+        // 뒤로가기 헤더
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => setState(() {
+                  _selectedAi = null;
+                  _selectedName = null;
+                }),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.shade200,
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.arrow_back, size: 22),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.asset(
+                  _getBotImage(_selectedAi),
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '$_selectedAi',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              if (_selectedName != null && _selectedName!.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Text(
+                  _selectedName!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Text(
+                '${alarms.length}개',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF258AE4),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 알람 목록
+        Expanded(
+          child: alarms.isEmpty
+              ? Center(
+                  child: Text('등록된 알람이 없습니다.',
+                      style: TextStyle(fontSize: 15, color: Colors.grey.shade500)),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadAlarms,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 120),
+                    itemCount: alarms.length,
+                    itemBuilder: (context, index) {
+                      return _buildAlarmItem(alarms[index]);
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  /// 알람 아이템
   Widget _buildAlarmItem(AlarmModel alarm) {
     final isOn = alarm.on ?? false;
     final allDays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -525,7 +781,6 @@ class _AlarmTabState extends State<AlarmTab> {
       ),
       child: Column(
         children: [
-          // 상단 - 흰색 배경, 둥근 상단 모서리
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 10, 10),
             decoration: const BoxDecoration(
@@ -538,22 +793,11 @@ class _AlarmTabState extends State<AlarmTab> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 왼쪽: AI ID, 시간, 제목
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // AI ID (인형 번호)
-                      Text(
-                        '${alarm.ai ?? ''}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      // 시간 - 30dp 크기
+                      const SizedBox(height: 4),
                       Text(
                         alarm.time ?? '',
                         style: TextStyle(
@@ -562,7 +806,6 @@ class _AlarmTabState extends State<AlarmTab> {
                           color: isOn ? Colors.black : const Color(0xFFD8D8D8),
                         ),
                       ),
-                      // 제목 - 20dp 크기
                       Text(
                         alarm.title ?? '',
                         style: TextStyle(
@@ -573,10 +816,8 @@ class _AlarmTabState extends State<AlarmTab> {
                     ],
                   ),
                 ),
-                // 오른쪽: ON/OFF 토글 + 더보기 버튼
                 Row(
                   children: [
-                    // ON/OFF 토글 - 90x45dp 크기
                     GestureDetector(
                       onTap: () => _toggleAlarm(alarm),
                       child: Image.asset(
@@ -595,7 +836,6 @@ class _AlarmTabState extends State<AlarmTab> {
                         },
                       ),
                     ),
-                    // 더보기 버튼
                     GestureDetector(
                       onTap: () => _showActionDialog(alarm),
                       child: Padding(
@@ -619,11 +859,10 @@ class _AlarmTabState extends State<AlarmTab> {
               ],
             ),
           ),
-          // 하단 - #EFF0F4 배경, 둥근 하단 모서리, 알람 아이콘 + 요일
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             decoration: const BoxDecoration(
-              color: Color(0xFFEFF0F4), // alarm_bottom_background
+              color: Color(0xFFEFF0F4),
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(15),
                 bottomRight: Radius.circular(15),
@@ -631,7 +870,6 @@ class _AlarmTabState extends State<AlarmTab> {
             ),
             child: Row(
               children: [
-                // 알람 ON/OFF 아이콘
                 Image.asset(
                   isOn
                       ? 'assets/images/alarm_on.png'
@@ -647,7 +885,6 @@ class _AlarmTabState extends State<AlarmTab> {
                   },
                 ),
                 const SizedBox(width: 8),
-                // 요일 또는 날짜
                 Expanded(
                   child: alarm.classification == 0
                       ? Row(
@@ -655,7 +892,7 @@ class _AlarmTabState extends State<AlarmTab> {
                           children: allDays.asMap().entries.map((entry) {
                             final day = entry.value;
                             final isSelected = selectedDays.contains(day);
-                            final isWeekend = entry.key == 0 || entry.key == 6; // 일, 토
+                            final isWeekend = entry.key == 0 || entry.key == 6;
                             return _buildDayLabel(day, isSelected, isOn, isWeekend);
                           }).toList(),
                         )
@@ -676,7 +913,6 @@ class _AlarmTabState extends State<AlarmTab> {
     );
   }
 
-  /// 요일 라벨 위젯 - 선택된 요일 강조 표시
   Widget _buildDayLabel(String day, bool isSelected, bool isOn, bool isWeekend) {
     const primaryColor = Color(0xFF258AE4);
 
